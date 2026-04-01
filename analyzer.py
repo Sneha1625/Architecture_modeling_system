@@ -1,84 +1,121 @@
-import anthropic
+"""
+analyzer.py — FREE AI Code Analyzer using Groq (FINAL STABLE VERSION)
+"""
+
 import os
+import json
 from dotenv import load_dotenv
+from groq import Groq
 
-# Fix: load .env using the file's actual location
-base_dir = os.path.dirname(os.path.abspath(__file__))
-dotenv_path = os.path.join(base_dir, ".env")
-load_dotenv(dotenv_path)
+# ================= ENV =================
+load_dotenv()
 
-api_key = os.getenv("ANTHROPIC_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
-    raise ValueError("API key not found! Check your .env file.")
+    raise ValueError("Groq API key not found! Check your .env file.")
 
-client = anthropic.Anthropic(api_key="ANTHROPIC_API_KEY")
+client = Groq(api_key=api_key)
 
 
-def analyze_function(func_name, func_args, file_path, source_code):
-    prompt = f"""You are an expert Python code reviewer.
+# ================= HELPER =================
+def safe_json_parse(text):
+    try:
+        text = text.replace("```json", "").replace("```", "").strip()
+        return json.loads(text)
+    except:
+        return {
+            "responsibility": "Could not parse AI response",
+            "issues": [],
+            "suggestions": ["AI response format issue"],
+            "quality_score": 0,
+            "complexity": "unknown"
+        }
 
-Analyze this Python code from file '{file_path}':
-```python
+
+# ================= FUNCTION ANALYSIS =================
+def analyze_function(func, source_code, file_path):
+
+    prompt = f"""
+You are a senior Python code reviewer.
+
+Analyze ONLY this function from the code.
+
+Function Name: {func.get("name")}
+
+Full Code:
 {source_code}
-```
 
-Focus on the function called '{func_name}' with arguments {func_args}.
+STRICTLY return JSON:
 
-Give me:
-1. What this function does (1-2 sentences)
-2. Any code smells or issues
-3. Suggestions to improve it
-4. Complexity rating: low / medium / high
+{{
+ "responsibility": "clear explanation of what function does",
+ "issues": [
+   "real issues (edge cases, bugs, inefficiency)"
+ ],
+ "suggestions": [
+   "specific improvements for THIS function"
+ ],
+ "quality_score": 0-100,
+ "complexity": "low|medium|high"
+}}
 
-Keep your response concise and structured."""
+IMPORTANT:
+- Suggestions must be specific to THIS code
+- Mention improvements like:
+  - edge case handling
+  - time complexity
+  - readability
+  - Python best practices
+"""
 
-    message = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    return message.content[0].text
-
-
-def analyze_parsed_result(parsed_result, source_code):
-    all_analysis = []
-
-    print(f"\nAnalyzing file: {parsed_result['file']}")
-    print(f"Found {len(parsed_result['functions'])} functions to analyze...\n")
-
-    for func in parsed_result["functions"]:
-        print(f"  Analyzing function: {func['name']}...")
-        analysis = analyze_function(
-            func["name"],
-            func["args"],
-            parsed_result["file"],
-            source_code
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",   # ✅ WORKING MODEL
+            messages=[{"role": "user", "content": prompt}]
         )
-        all_analysis.append({
-            "type": "function",
-            "name": func["name"],
-            "line": func["line"],
-            "analysis": analysis
+
+        raw = response.choices[0].message.content
+        return safe_json_parse(raw)
+
+    except Exception as e:
+        return {
+            "responsibility": "Error in AI analysis",
+            "issues": [str(e)],
+            "suggestions": ["Check API/model configuration"],
+            "quality_score": 0,
+            "complexity": "unknown"
+        }
+
+
+# ================= MAIN =================
+def analyze_parsed_result(parsed_result, source_code):
+
+    functions_result = []
+
+    for func in parsed_result.get("functions", []):
+        analysis = analyze_function(func, source_code, parsed_result.get("file"))
+
+        functions_result.append({
+            "name": func.get("name"),
+            "line": func.get("line"),
+            "analysis": analysis,
+            "complexity": func.get("complexity", 1),
+            "complexity_label": func.get("complexity_label", "low")
         })
 
-    return all_analysis
+    return {
+        "functions": functions_result   # ✅ IMPORTANT (matches app.py)
+    }
 
 
-# Test it
+# ================= TEST =================
 if __name__ == "__main__":
     from parser import parse_file, read_file
 
     parsed = parse_file("../samples/sample.py")
     source = read_file("../samples/sample.py")
 
-    results = analyze_parsed_result(parsed, source)
+    result = analyze_parsed_result(parsed, source)
 
-    for item in results:
-        print(f"\n{'='*50}")
-        print(f"Function: {item['name']} (line {item['line']})")
-        print(f"{'='*50}")
-        print(item["analysis"])
+    print(json.dumps(result, indent=2))

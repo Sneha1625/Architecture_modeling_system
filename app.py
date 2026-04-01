@@ -1,76 +1,135 @@
+"""
+app.py — Streamlit Frontend
+"""
+
 import streamlit as st
 import sys
 import os
+import tempfile
+import networkx as nx
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
-from parser import parse_file, read_file
+from parser import parse_file, read_file, get_summary
 from analyzer import analyze_parsed_result
 from architect import build_graph, draw_graph
+from embedder import embed_parsed_result, find_similar, build_similarity_matrix
 
-st.set_page_config(
-    page_title="AI Code Analyzer",
-    page_icon="🧠",
-    layout="wide"
-)
+# ─── Page config ─────────────────────────────────────────
+st.set_page_config(page_title="AI Code Analyzer", page_icon="🧠", layout="wide")
 
-st.title("🧠 AI-Driven Semantic Code Analyzer")
-st.markdown("Upload a Python file to analyze its structure, get AI feedback, and view the architecture graph.")
+st.title("🧠 AI Code Analyzer")
+st.divider()
 
-uploaded_file = st.file_uploader("Upload a Python file", type=["py"])
+# ─── Upload ──────────────────────────────────────────────
+uploaded_file = st.file_uploader("Upload Python file", type=["py"])
 
-if uploaded_file:
-    # Save uploaded file temporarily
-    temp_path = f"temp_{uploaded_file.name}"
-    with open(temp_path, "w", encoding="utf-8") as f:
-        f.write(uploaded_file.getvalue().decode("utf-8"))
+if not uploaded_file:
+    st.stop()
 
-    source_code = read_file(temp_path)
+with tempfile.NamedTemporaryFile(delete=False, suffix=".py", mode="w", encoding="utf-8") as tmp:
+    tmp.write(uploaded_file.getvalue().decode("utf-8"))
+    temp_path = tmp.name
 
-    st.subheader("📄 Source Code")
-    st.code(source_code, language="python")
+source_code = read_file(temp_path)
+parsed = parse_file(temp_path)
+summary = get_summary(parsed)
 
-    with st.spinner("Parsing code structure..."):
-        parsed = parse_file(temp_path)
+if "error" in parsed:
+    st.error(parsed["error"])
+    st.stop()
 
-    # Show parsed structure
-    st.subheader("🔍 Parsed Structure")
-    col1, col2, col3 = st.columns(3)
+# ─── Overview ────────────────────────────────────────────
+st.subheader("📊 Overview")
+c1, c2, c3 = st.columns(3)
+c1.metric("Functions", summary.get("total_functions", 0))
+c2.metric("Classes", summary.get("total_classes", 0))
+c3.metric("Complexity", summary.get("avg_complexity", 0))
 
-    with col1:
-        st.metric("Functions", len(parsed["functions"]))
-        for f in parsed["functions"]:
-            st.write(f"• `{f['name']}()` — line {f['line']}")
+st.divider()
 
-    with col2:
-        st.metric("Classes", len(parsed["classes"]))
-        for c in parsed["classes"]:
-            st.write(f"• `{c['name']}` — line {c['line']}")
+# ─── Tabs ────────────────────────────────────────────────
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📄 Code",
+    "🌳 AST",
+    "🤖 AI",
+    "🏗️ Graph"
+])
 
-    with col3:
-        st.metric("Imports", len(parsed["imports"]))
-        for i in parsed["imports"]:
-            st.write(f"• `{i}`")
+# ═══════════════════════════════
+# TAB 1
+# ═══════════════════════════════
+with tab1:
+    st.code(source_code, language="python", line_numbers=True)
 
-    # AI Analysis
-    st.subheader("🤖 AI Analysis")
-    with st.spinner("Analyzing with AI..."):
-        results = analyze_parsed_result(parsed, source_code)
+# ═══════════════════════════════
+# TAB 2 (AST)
+# ═══════════════════════════════
+with tab2:
+    st.subheader("Functions")
 
-    for item in results:
-        with st.expander(f"Function: {item['name']} (line {item['line']})"):
-            st.markdown(item["analysis"])
+    for fn in parsed.get("functions", []):
+        with st.expander(
+            f"{fn.get('name','unknown')} — line {fn.get('line','N/A')}"
+        ):
+            st.write(fn)
 
-    # Architecture Graph
-    st.subheader("🏗️ Architecture Graph")
-    with st.spinner("Building architecture graph..."):
+    st.subheader("Classes")
+
+    for cls in parsed.get("classes", []):
+        with st.expander(
+            f"{cls.get('name','unknown')} — line {cls.get('line','N/A')}"
+        ):
+            st.write(cls)
+
+# ═══════════════════════════════
+# TAB 3 (AI)
+# ═══════════════════════════════
+with tab3:
+    if st.button("Run AI Analysis"):
+        analysis = analyze_parsed_result(parsed, source_code)
+        st.session_state["analysis"] = analysis
+
+    if "analysis" in st.session_state:
+        analysis = st.session_state["analysis"]
+
+        # FUNCTIONS
+        st.subheader("Function Analysis")
+
+        for fn in analysis.get("functions", []):
+            with st.expander(
+                f"⚙️ `{fn.get('name','unknown')}()` — line {fn.get('line','N/A')}"
+            ):
+                st.write(fn.get("analysis", {}))
+
+        # CLASSES
+        st.subheader("Class Analysis")
+
+        for cls in analysis.get("classes", []):
+            with st.expander(
+                f"🏛️ `{cls.get('name','unknown')}` — line {cls.get('line','N/A')}"
+            ):
+                st.write(cls.get("analysis", {}))
+
+# ═══════════════════════════════
+# TAB 4 (GRAPH)
+# ═══════════════════════════════
+with tab4:
+    if st.button("Generate Graph"):
         G = build_graph([parsed])
-        graph_path = "outputs/architecture.png"
-        draw_graph(G, output_path=graph_path)
 
-    st.image(graph_path, caption="Software Architecture Graph", use_container_width=True)
+        os.makedirs("outputs", exist_ok=True)
+        path = os.path.join("outputs", "graph.png")
 
-    # Cleanup
-    os.remove(temp_path)
+        draw_graph(G, output_path=path)
 
-    st.success("✅ Analysis complete!")
+        st.image(path)
+
+        st.write("Nodes:", G.number_of_nodes())
+        st.write("Edges:", G.number_of_edges())
+
+# ─── Cleanup ─────────────────────────────────────────────
+try:
+    os.unlink(temp_path)
+except:
+    pass
