@@ -1,71 +1,81 @@
 """
-app.py — FINAL CLEAN VERSION (FUNCTION-LEVEL DEPENDENCY GRAPH FIXED)
-Run: python -m streamlit run app.py
+FINAL APP.PY (WITH MULTI-FILE SUPPORT + 11 FEATURES)
 """
 
 import streamlit as st
 import sys
 import os
 import tempfile
+import networkx as nx
 
+from dotenv import load_dotenv
+load_dotenv()
+
+# ───── PATH FIX ─────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 sys.path.insert(0, os.path.join(BASE_DIR, "features"))
 
-# ───────────────── CORE IMPORTS ─────────────────
+# ───── IMPORTS ─────
 from src.parser import parse_file, read_file, get_summary
 from src.analyzer import analyze_parsed_result
 from src.architect import build_graph, draw_graph
 from src.embedder import embed_parsed_result
+
 from features.testgenerator import generate_tests_for_file, get_test_summary
-from features.refactorsuggestor import refactor_all_functions, get_refactor_summary
+from features.refactorsuggestor import refactor_all_functions
 from features.docgenerator import generate_readme, build_complexity_report
 
-# ───────────────── FUNCTION DEPENDENCY MODULE ─────────────────
 from src.dependency import build_dependency_graph, draw_dependency_graph
+from features.aiexplainer import explain_code
 
 
-# ───────────────── PAGE CONFIG ─────────────────
+# ───── UI ─────
 st.set_page_config(page_title="AI Code Analyzer", layout="wide")
+st.title("🧠 AI Code Analyzer (11 Features)")
 
-st.title("🧠 AI-Driven Semantic Code Analyzer")
-st.caption("Architecture + AI + Function Dependency + Refactoring System")
+# ───── MULTI FILE UPLOAD (FIXED FEATURE 11) ─────
+uploaded_files = st.file_uploader(
+    "Upload Python files (you can select multiple)",
+    type=["py"],
+    accept_multiple_files=True
+)
 
-
-# ───────────────── FILE UPLOAD ─────────────────
-uploaded_file = st.file_uploader("Upload Python file", type=["py"])
-
-if uploaded_file:
-
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".py")
-    tmp.write(uploaded_file.getvalue())
-    tmp.close()
-
-    file_path = tmp.name
-
-else:
-    st.info("Upload a Python file to start analysis")
+if not uploaded_files:
+    st.info("Upload 1 or more Python files to start")
     st.stop()
 
+# ───── SAVE TEMP FILES ─────
+file_paths = []
 
-# ───────────────── PARSE FILE ─────────────────
-source_code = read_file(file_path)
-parsed = parse_file(file_path)
-summary = get_summary(parsed)
+for file in uploaded_files:
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".py")
+    tmp.write(file.getvalue())
+    tmp.close()
+    file_paths.append(tmp.name)
 
+# ───── PARSE ALL FILES ─────
+parsed_files = []
+all_sources = []
 
-# ───────────────── METRICS ─────────────────
+for path in file_paths:
+    parsed_files.append(parse_file(path))
+    all_sources.append(read_file(path))
+
+# ───── SUMMARY ─────
+total_functions = sum(get_summary(p)["total_functions"] for p in parsed_files)
+total_classes = sum(get_summary(p)["total_classes"] for p in parsed_files)
+total_imports = sum(get_summary(p)["total_imports"] for p in parsed_files)
+
 c1, c2, c3, c4 = st.columns(4)
-
-c1.metric("Functions", summary["total_functions"])
-c2.metric("Classes", summary["total_classes"])
-c3.metric("Imports", summary["total_imports"])
-c4.metric("Complexity", summary["avg_complexity"])
+c1.metric("Functions", total_functions)
+c2.metric("Classes", total_classes)
+c3.metric("Imports", total_imports)
+c4.metric("Files", len(file_paths))
 
 st.divider()
 
-
-# ───────────────── TABS ─────────────────
+# ───── TABS (11 FEATURES) ─────
 tabs = st.tabs([
     "📄 Code",
     "🔍 AST",
@@ -75,114 +85,125 @@ tabs = st.tabs([
     "🧪 Tests",
     "♻️ Refactor",
     "📚 Docs",
-    "📊 Dependency Graph"
+    "📊 Dependency Graph",
+    "🧠 Explain Code",
+    "🌐 Multi-file Analysis"
 ])
 
-(t1, t2, t3, t4, t5, t6, t7, t8, t9) = tabs
+(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11) = tabs
 
 
-# ───────────────── TAB 1: CODE ─────────────────
+# ───── 1 CODE ─────
 with t1:
-    st.code(source_code, language="python")
+    for i, code in enumerate(all_sources):
+        st.subheader(f"File {i+1}")
+        st.code(code, language="python")
 
 
-# ───────────────── TAB 2: AST ─────────────────
+# ───── 2 AST ─────
 with t2:
-    st.json(parsed)
+    st.json(parsed_files)
 
 
-# ───────────────── TAB 3: AI ANALYSIS ─────────────────
+# ───── 3 AI ANALYSIS ─────
 with t3:
     if st.button("Run AI Analysis"):
-        result = analyze_parsed_result(parsed, source_code)
+        result = analyze_parsed_result(parsed_files[0], all_sources[0])
         st.write(result)
 
 
-# ───────────────── TAB 4: ARCHITECTURE ─────────────────
+# ───── 4 ARCHITECTURE ─────
 with t4:
-    if st.button("Generate Architecture Graph"):
-
-        G = build_graph([parsed])
-
+    if st.button("Generate Architecture"):
+        G = build_graph(parsed_files)
         os.makedirs("outputs", exist_ok=True)
         path = "outputs/architecture.png"
-
-        draw_graph(G, output_path=path)
-
+        draw_graph(G, path)
         st.image(path)
 
-        st.success(f"Nodes: {G.number_of_nodes()} | Edges: {G.number_of_edges()}")
 
-
-# ───────────────── TAB 5: EMBEDDINGS ─────────────────
+# ───── 5 EMBEDDINGS ─────
 with t5:
     if st.button("Generate Embeddings"):
-        emb = embed_parsed_result(parsed)
+        emb = embed_parsed_result(parsed_files[0])
         st.write(emb[:10])
 
 
-# ───────────────── TAB 6: TESTS ─────────────────
+# ───── 6 TESTS ─────
 with t6:
     if st.button("Generate Tests"):
-        tests = generate_tests_for_file(parsed, source_code)
-        summary = get_test_summary(tests)
-
-        st.write(summary)
+        tests = generate_tests_for_file(parsed_files[0], all_sources[0])
         st.code(tests)
 
 
-# ───────────────── TAB 7: REFACTOR ─────────────────
+# ───── 7 REFACTOR ─────
 with t7:
-    if st.button("Refactor Code"):
-        result = refactor_all_functions(parsed, source_code)
-
-        for r in result:
+    if st.button("Refactor"):
+        res = refactor_all_functions(parsed_files[0], all_sources[0])
+        for r in res:
             st.code(r["result"]["refactored_code"])
 
 
-# ───────────────── TAB 8: DOCS ─────────────────
+# ───── 8 DOCS ─────
 with t8:
     if st.button("Generate Docs"):
-        readme = generate_readme([parsed])
-        report = build_complexity_report([parsed])
-
+        readme = generate_readme(parsed_files)
+        report = build_complexity_report(parsed_files)
         st.markdown(readme + "\n\n" + report)
 
 
-# ───────────────── TAB 9: FUNCTION DEPENDENCY GRAPH (FIXED FINAL) ─────────────────
+# ───── 9 DEPENDENCY GRAPH ─────
 with t9:
+    if st.button("Dependency Graph"):
+        G = nx.DiGraph()
 
-    st.markdown("### 🔥 Function / Method Dependency Graph")
-    st.caption("Shows which function/method calls which function")
-
-    st.info("""
-    ✔ Node = Function or Class  
-    ✔ Arrow A → B = A calls B  
-    ✔ Blue = Function  
-    ✔ Orange = Class  
-    """)
-
-    if st.button("Generate Dependency Graph"):
-
-        # IMPORTANT FIX:
-        # Use ONLY uploaded file (NOT BASE_DIR, NOT PROJECT ROOT)
-        G = build_dependency_graph(file_path)
+        for path in file_paths:
+            sub = build_dependency_graph(path)
+            G = nx.compose(G, sub)
 
         os.makedirs("outputs", exist_ok=True)
         path = "outputs/dependency.png"
-
         draw_dependency_graph(G, path)
 
-        st.image(path, use_container_width=True)
-
-        st.success(f"""
-        Functions/Classes: {G.number_of_nodes()}  
-        Call Dependencies: {G.number_of_edges()}
-        """)
+        st.image(path)
+        st.write("Nodes:", G.number_of_nodes())
+        st.write("Edges:", G.number_of_edges())
 
 
-# ───────────────── CLEANUP ─────────────────
-try:
-    os.unlink(file_path)
-except:
-    pass
+# ───── 10 AI EXPLANATION ─────
+with t10:
+    code = all_sources[0]
+
+    if st.button("Explain Code"):
+        st.write(explain_code(code))
+
+
+# ───── 11 MULTI FILE ANALYSIS (NEW FEATURE) ─────
+with t11:
+
+    st.markdown("## 🌐 Multi-file Cross Module Analysis")
+
+    if st.button("Run Full Project Analysis 🚀"):
+
+        G = nx.DiGraph()
+
+        for path in file_paths:
+            sub = build_dependency_graph(path)
+            G = nx.compose(G, sub)
+
+        os.makedirs("outputs", exist_ok=True)
+        path = "outputs/multifile.png"
+        draw_dependency_graph(G, path)
+
+        st.image(path)
+
+        cycles = list(nx.simple_cycles(G))
+
+        if cycles:
+            st.error("Circular Dependencies Found!")
+            for c in cycles:
+                st.write(" ➜ ".join(c))
+        else:
+            st.success("No circular dependencies found")
+
+        st.success(f"Files: {len(file_paths)} | Nodes: {G.number_of_nodes()} | Edges: {G.number_of_edges()}")
