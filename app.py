@@ -1,5 +1,5 @@
 """
-FINAL APP.PY (WITH MULTI-FILE + 12 FEATURES INCLUDING AI CODE REVIEW BOT)
+FINAL APP.PY (13 FEATURES INCLUDING TECHNICAL DEBT CALCULATOR)
 """
 
 import streamlit as st
@@ -23,17 +23,18 @@ from src.analyzer import analyze_parsed_result
 from src.architect import build_graph, draw_graph
 from src.embedder import embed_parsed_result
 
-from features.testgenerator import generate_tests_for_file, get_test_summary
+from features.testgenerator import generate_tests_for_file
 from features.refactorsuggestor import refactor_all_functions
 from features.docgenerator import generate_readme, build_complexity_report
 
 from src.dependency import build_dependency_graph, draw_dependency_graph
 from features.aiexplainer import explain_code
-from features.aicodeviewer import review_code   # ✅ NEW FEATURE
+from features.aicodeviewer import review_code
+from features.techdebt import calculate_technical_debt   # ✅ NEW
 
 # ───── UI ─────
 st.set_page_config(page_title="AI Code Analyzer", layout="wide")
-st.title("🧠 AI Code Analyzer (12 Features)")
+st.title("🧠 AI Code Analyzer (13 Features)")
 
 # ───── FILE UPLOAD ─────
 uploaded_files = st.file_uploader(
@@ -60,11 +61,8 @@ parsed_files = []
 all_sources = []
 
 for path in file_paths:
-    try:
-        parsed_files.append(parse_file(path))
-        all_sources.append(read_file(path))
-    except Exception as e:
-        st.error(f"Error parsing file: {e}")
+    parsed_files.append(parse_file(path))
+    all_sources.append(read_file(path))
 
 # ───── SUMMARY ─────
 total_functions = sum(get_summary(p)["total_functions"] for p in parsed_files)
@@ -79,7 +77,7 @@ c4.metric("Files", len(file_paths))
 
 st.divider()
 
-# ───── TABS (12 FEATURES) ─────
+# ───── TABS (13 FEATURES) ─────
 tabs = st.tabs([
     "📄 Code",
     "🔍 AST",
@@ -92,10 +90,11 @@ tabs = st.tabs([
     "📊 Dependency Graph",
     "🧠 Explain Code",
     "🌐 Multi-file Analysis",
-    "👨‍💻 Code Review Bot"   # ✅ NEW
+    "👨‍💻 Code Review Bot",
+    "💰 Technical Debt"
 ])
 
-(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12) = tabs
+(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12,t13) = tabs
 
 
 # ───── 1 CODE ─────
@@ -113,11 +112,8 @@ with t2:
 # ───── 3 AI ANALYSIS ─────
 with t3:
     if st.button("Run AI Analysis"):
-        try:
-            result = analyze_parsed_result(parsed_files[0], all_sources[0])
-            st.write(result)
-        except Exception as e:
-            st.error(str(e))
+        result = analyze_parsed_result(parsed_files[0], all_sources[0])
+        st.write(result)
 
 
 # ───── 4 ARCHITECTURE ─────
@@ -181,16 +177,12 @@ with t9:
 # ───── 10 AI EXPLANATION ─────
 with t10:
     if st.button("Explain Code"):
-        try:
-            explanation = explain_code(all_sources[0])
-            st.write(explanation)
-        except Exception as e:
-            st.error(str(e))
+        explanation = explain_code(all_sources[0])
+        st.write(explanation)
 
 
 # ───── 11 MULTI FILE ANALYSIS ─────
 with t11:
-
     st.markdown("## 🌐 Multi-file Cross Module Analysis")
 
     if st.button("Run Full Project Analysis 🚀"):
@@ -219,35 +211,42 @@ with t11:
         st.success(f"Files: {len(file_paths)} | Nodes: {G.number_of_nodes()} | Edges: {G.number_of_edges()}")
 
 
-# ───── 12 AI CODE REVIEW BOT (NEW FEATURE) ─────
+# ───── 12 CODE REVIEW BOT ─────
 with t12:
-
     st.markdown("## 👨‍💻 AI Code Review Bot")
-    st.caption("Acts like a senior developer reviewing your code")
 
-    option = st.selectbox(
-        "Choose code",
-        ["Full Code", "Paste Custom Code"]
-    )
+    option = st.selectbox("Choose code", ["Full Code", "Paste Custom Code"])
 
-    code_to_review = ""
-
-    if option == "Full Code":
-        code_to_review = all_sources[0]
-    else:
-        code_to_review = st.text_area("Paste your code here")
+    code_to_review = all_sources[0] if option == "Full Code" else st.text_area("Paste code here")
 
     if st.button("Review Code 🔍"):
-
         if code_to_review.strip() == "":
             st.warning("Please provide code")
         else:
-            try:
-                review = review_code(code_to_review)
-                st.success("Review Generated")
-                st.write(review)
-            except Exception as e:
-                st.error(str(e))
+            review = review_code(code_to_review)
+            st.write(review)
+
+
+# ───── 13 TECHNICAL DEBT ─────
+with t13:
+
+    st.markdown("## 💰 Technical Debt Calculator")
+
+    if st.button("Calculate Technical Debt"):
+
+        result = calculate_technical_debt(parsed_files)
+
+        c1, c2 = st.columns(2)
+        c1.metric("Estimated Hours", f"{result['estimated_hours']} hrs")
+        c2.metric("Estimated Cost", f"₹{result['estimated_cost']}")
+
+        st.divider()
+
+        st.write("### Breakdown")
+        st.write(f"Functions: {result['functions']}")
+        st.write(f"Classes: {result['classes']}")
+        st.write(f"Complexity Penalty: {result['complexity_penalty']} hrs")
+        st.write(f"Long Function Penalty: {result['long_function_penalty']} hrs")
 
 
 # ───── CLEANUP ─────
