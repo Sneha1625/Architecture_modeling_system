@@ -1,7 +1,8 @@
 """
 FINAL APP.PY (WITH MULTI-FILE SUPPORT + 11 FEATURES)
 """
-
+from features.smelldetector import detect_smells
+from features.securityscanner import scan_security
 import streamlit as st
 import sys
 import os
@@ -28,12 +29,48 @@ from features.docgenerator import generate_readme, build_complexity_report
 
 from src.dependency import build_dependency_graph, draw_dependency_graph
 from features.aiexplainer import explain_code
-
+from features.aicodeviewer import review_code
+from features.techdebt import calculate_technical_debt
 
 # ───── UI ─────
 st.set_page_config(page_title="AI Code Analyzer", layout="wide")
 st.title("🧠 AI Code Analyzer (11 Features)")
+# ───── SCROLLABLE TABS CSS ─────
+st.markdown("""
+<style>
+    .stTabs [data-baseweb="tab-list"] {
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: #888 #f0f0f0;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        padding-bottom: 4px;
+    }
 
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-track {
+        background: #f0f0f0;
+        border-radius: 10px;
+    }
+
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 10px;
+    }
+
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        flex-shrink: 0;
+    }
+</style>
+""", unsafe_allow_html=True)
 # ───── MULTI FILE UPLOAD (FIXED FEATURE 11) ─────
 uploaded_files = st.file_uploader(
     "Upload Python files (you can select multiple)",
@@ -87,10 +124,13 @@ tabs = st.tabs([
     "📚 Docs",
     "📊 Dependency Graph",
     "🧠 Explain Code",
-    "🌐 Multi-file Analysis"
+    "🌐 Multi-file Analysis",
+    "🔮 Code Smells", "🔐 Security",
+    "👨‍💻 Code Review Bot",
+    "💰 Technical Debt"
 ])
 
-(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11) = tabs
+(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12,t13,t14,t15) = tabs
 
 
 # ───── 1 CODE ─────
@@ -207,3 +247,70 @@ with t11:
             st.success("No circular dependencies found")
 
         st.success(f"Files: {len(file_paths)} | Nodes: {G.number_of_nodes()} | Edges: {G.number_of_edges()}")
+with t12:
+    if st.button("Detect Code Smells"):
+        result = detect_smells(all_sources[0])
+        st.markdown(f"### Smell Rating: {result['rating']}")
+        col1, col2 = st.columns(2)
+        col1.metric("Total Smells", result["total_smells"])
+        col2.metric("Code Quality Score", f"{result['smell_score']}/100")
+        st.divider()
+        for smell in result["smells"]:
+            color = "error" if smell["severity"] == "HIGH" else "warning" if smell["severity"] == "MEDIUM" else "info"
+            getattr(st, color)(f"{smell['emoji']} **{smell['smell']}** [{smell['severity']}] — {smell['location']}: {smell['detail']}")
+
+
+# ───── 13 SECURITY SCANNER ─────
+with t13:
+    if st.button("Run Security Scan"):
+        result = scan_security(all_sources[0])
+        st.markdown(f"### Security Rating: {result['rating']}")
+        col1, col2 = st.columns(2)
+        col1.metric("Vulnerabilities Found", result["total"])
+        col2.metric("Status", result["rating"])
+        st.divider()
+        if result["total"] == 0:
+            st.success("✅ No vulnerabilities found! Your code looks secure.")
+        for vuln in result["vulnerabilities"]:
+            if vuln["severity"] == "CRITICAL":
+                st.error(f"{vuln['emoji']} **{vuln['type']}** [CRITICAL] at line {vuln['line']} — {vuln['detail']}")
+            elif vuln["severity"] == "HIGH":
+                st.warning(f"{vuln['emoji']} **{vuln['type']}** [HIGH] at line {vuln['line']} — {vuln['detail']}")
+            else:
+                st.info(f"{vuln['emoji']} **{vuln['type']}** [{vuln['severity']}] at line {vuln['line']} — {vuln['detail']}")
+# ───── 14 CODE REVIEW BOT ─────
+with t14:
+    st.markdown("## 👨‍💻 AI Code Review Bot")
+
+    option = st.selectbox("Choose code", ["Full Code", "Paste Custom Code"])
+
+    code_to_review = all_sources[0] if option == "Full Code" else st.text_area("Paste code here")
+
+    if st.button("Review Code 🔍"):
+        if code_to_review.strip() == "":
+            st.warning("Please provide code")
+        else:
+            review = review_code(code_to_review)
+            st.write(review)
+
+
+# ───── 15 TECHNICAL DEBT ─────
+with t15:
+
+    st.markdown("## 💰 Technical Debt Calculator")
+
+    if st.button("Calculate Technical Debt"):
+
+        result = calculate_technical_debt(parsed_files)
+
+        c1, c2 = st.columns(2)
+        c1.metric("Estimated Hours", f"{result['estimated_hours']} hrs")
+        c2.metric("Estimated Cost", f"₹{result['estimated_cost']}")
+
+        st.divider()
+
+        st.write("### Breakdown")
+        st.write(f"Functions: {result['functions']}")
+        st.write(f"Classes: {result['classes']}")
+        st.write(f"Complexity Penalty: {result['complexity_penalty']} hrs")
+        st.write(f"Long Function Penalty: {result['long_function_penalty']} hrs")
