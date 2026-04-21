@@ -1,5 +1,5 @@
 """
-FINAL APP.PY (WITH MULTI-FILE SUPPORT + 11 FEATURES)
+FINAL APP.PY (WITH MULTI-FILE + 12 FEATURES INCLUDING AI CODE REVIEW BOT)
 """
 
 import streamlit as st
@@ -7,8 +7,9 @@ import sys
 import os
 import tempfile
 import networkx as nx
-
 from dotenv import load_dotenv
+
+# ───── LOAD ENV ─────
 load_dotenv()
 
 # ───── PATH FIX ─────
@@ -28,21 +29,21 @@ from features.docgenerator import generate_readme, build_complexity_report
 
 from src.dependency import build_dependency_graph, draw_dependency_graph
 from features.aiexplainer import explain_code
-
+from features.aicodeviewer import review_code   # ✅ NEW FEATURE
 
 # ───── UI ─────
 st.set_page_config(page_title="AI Code Analyzer", layout="wide")
-st.title("🧠 AI Code Analyzer (11 Features)")
+st.title("🧠 AI Code Analyzer (12 Features)")
 
-# ───── MULTI FILE UPLOAD (FIXED FEATURE 11) ─────
+# ───── FILE UPLOAD ─────
 uploaded_files = st.file_uploader(
-    "Upload Python files (you can select multiple)",
+    "Upload Python files (multiple supported)",
     type=["py"],
     accept_multiple_files=True
 )
 
 if not uploaded_files:
-    st.info("Upload 1 or more Python files to start")
+    st.info("Upload at least one Python file")
     st.stop()
 
 # ───── SAVE TEMP FILES ─────
@@ -54,13 +55,16 @@ for file in uploaded_files:
     tmp.close()
     file_paths.append(tmp.name)
 
-# ───── PARSE ALL FILES ─────
+# ───── PARSE FILES ─────
 parsed_files = []
 all_sources = []
 
 for path in file_paths:
-    parsed_files.append(parse_file(path))
-    all_sources.append(read_file(path))
+    try:
+        parsed_files.append(parse_file(path))
+        all_sources.append(read_file(path))
+    except Exception as e:
+        st.error(f"Error parsing file: {e}")
 
 # ───── SUMMARY ─────
 total_functions = sum(get_summary(p)["total_functions"] for p in parsed_files)
@@ -75,7 +79,7 @@ c4.metric("Files", len(file_paths))
 
 st.divider()
 
-# ───── TABS (11 FEATURES) ─────
+# ───── TABS (12 FEATURES) ─────
 tabs = st.tabs([
     "📄 Code",
     "🔍 AST",
@@ -87,10 +91,11 @@ tabs = st.tabs([
     "📚 Docs",
     "📊 Dependency Graph",
     "🧠 Explain Code",
-    "🌐 Multi-file Analysis"
+    "🌐 Multi-file Analysis",
+    "👨‍💻 Code Review Bot"   # ✅ NEW
 ])
 
-(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11) = tabs
+(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12) = tabs
 
 
 # ───── 1 CODE ─────
@@ -108,8 +113,11 @@ with t2:
 # ───── 3 AI ANALYSIS ─────
 with t3:
     if st.button("Run AI Analysis"):
-        result = analyze_parsed_result(parsed_files[0], all_sources[0])
-        st.write(result)
+        try:
+            result = analyze_parsed_result(parsed_files[0], all_sources[0])
+            st.write(result)
+        except Exception as e:
+            st.error(str(e))
 
 
 # ───── 4 ARCHITECTURE ─────
@@ -138,7 +146,7 @@ with t6:
 
 # ───── 7 REFACTOR ─────
 with t7:
-    if st.button("Refactor"):
+    if st.button("Refactor Code"):
         res = refactor_all_functions(parsed_files[0], all_sources[0])
         for r in res:
             st.code(r["result"]["refactored_code"])
@@ -172,13 +180,15 @@ with t9:
 
 # ───── 10 AI EXPLANATION ─────
 with t10:
-    code = all_sources[0]
-
     if st.button("Explain Code"):
-        st.write(explain_code(code))
+        try:
+            explanation = explain_code(all_sources[0])
+            st.write(explanation)
+        except Exception as e:
+            st.error(str(e))
 
 
-# ───── 11 MULTI FILE ANALYSIS (NEW FEATURE) ─────
+# ───── 11 MULTI FILE ANALYSIS ─────
 with t11:
 
     st.markdown("## 🌐 Multi-file Cross Module Analysis")
@@ -207,3 +217,42 @@ with t11:
             st.success("No circular dependencies found")
 
         st.success(f"Files: {len(file_paths)} | Nodes: {G.number_of_nodes()} | Edges: {G.number_of_edges()}")
+
+
+# ───── 12 AI CODE REVIEW BOT (NEW FEATURE) ─────
+with t12:
+
+    st.markdown("## 👨‍💻 AI Code Review Bot")
+    st.caption("Acts like a senior developer reviewing your code")
+
+    option = st.selectbox(
+        "Choose code",
+        ["Full Code", "Paste Custom Code"]
+    )
+
+    code_to_review = ""
+
+    if option == "Full Code":
+        code_to_review = all_sources[0]
+    else:
+        code_to_review = st.text_area("Paste your code here")
+
+    if st.button("Review Code 🔍"):
+
+        if code_to_review.strip() == "":
+            st.warning("Please provide code")
+        else:
+            try:
+                review = review_code(code_to_review)
+                st.success("Review Generated")
+                st.write(review)
+            except Exception as e:
+                st.error(str(e))
+
+
+# ───── CLEANUP ─────
+for path in file_paths:
+    try:
+        os.unlink(path)
+    except:
+        pass
