@@ -1,5 +1,5 @@
 """
-FINAL APP.PY (WITH MULTI-FILE SUPPORT + 11 FEATURES)
+FINAL APP.PY (13 FEATURES INCLUDING TECHNICAL DEBT CALCULATOR)
 """
 from features.smelldetector import detect_smells
 from features.securityscanner import scan_security
@@ -8,8 +8,9 @@ import sys
 import os
 import tempfile
 import networkx as nx
-
 from dotenv import load_dotenv
+
+# ───── LOAD ENV ─────
 load_dotenv()
 
 # ───── PATH FIX ─────
@@ -23,13 +24,14 @@ from src.analyzer import analyze_parsed_result
 from src.architect import build_graph, draw_graph
 from src.embedder import embed_parsed_result
 
-from features.testgenerator import generate_tests_for_file, get_test_summary
+from features.testgenerator import generate_tests_for_file
 from features.refactorsuggestor import refactor_all_functions
 from features.docgenerator import generate_readme, build_complexity_report
 
 from src.dependency import build_dependency_graph, draw_dependency_graph
 from features.aiexplainer import explain_code
 from features.aicodeviewer import review_code
+<<<<<<< HEAD
 from features.techdebt import calculate_technical_debt
 
 # ───── UI ─────
@@ -72,14 +74,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 # ───── MULTI FILE UPLOAD (FIXED FEATURE 11) ─────
+=======
+from features.techdebt import calculate_technical_debt   # ✅ NEW
+
+# ───── UI ─────
+st.set_page_config(page_title="AI Code Analyzer", layout="wide")
+st.title("🧠 AI Code Analyzer (13 Features)")
+
+# ───── FILE UPLOAD ─────
+>>>>>>> f9aeed17c94bfbbbadc766832171258103dd1e7b
 uploaded_files = st.file_uploader(
-    "Upload Python files (you can select multiple)",
+    "Upload Python files (multiple supported)",
     type=["py"],
     accept_multiple_files=True
 )
 
 if not uploaded_files:
-    st.info("Upload 1 or more Python files to start")
+    st.info("Upload at least one Python file")
     st.stop()
 
 # ───── SAVE TEMP FILES ─────
@@ -91,7 +102,7 @@ for file in uploaded_files:
     tmp.close()
     file_paths.append(tmp.name)
 
-# ───── PARSE ALL FILES ─────
+# ───── PARSE FILES ─────
 parsed_files = []
 all_sources = []
 
@@ -112,7 +123,7 @@ c4.metric("Files", len(file_paths))
 
 st.divider()
 
-# ───── TABS (11 FEATURES) ─────
+# ───── TABS (13 FEATURES) ─────
 tabs = st.tabs([
     "📄 Code",
     "🔍 AST",
@@ -125,12 +136,19 @@ tabs = st.tabs([
     "📊 Dependency Graph",
     "🧠 Explain Code",
     "🌐 Multi-file Analysis",
+<<<<<<< HEAD
     "🔮 Code Smells", "🔐 Security",
+=======
+>>>>>>> f9aeed17c94bfbbbadc766832171258103dd1e7b
     "👨‍💻 Code Review Bot",
     "💰 Technical Debt"
 ])
 
+<<<<<<< HEAD
 (t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12,t13,t14,t15) = tabs
+=======
+(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12,t13) = tabs
+>>>>>>> f9aeed17c94bfbbbadc766832171258103dd1e7b
 
 
 # ───── 1 CODE ─────
@@ -178,7 +196,7 @@ with t6:
 
 # ───── 7 REFACTOR ─────
 with t7:
-    if st.button("Refactor"):
+    if st.button("Refactor Code"):
         res = refactor_all_functions(parsed_files[0], all_sources[0])
         for r in res:
             st.code(r["result"]["refactored_code"])
@@ -212,15 +230,13 @@ with t9:
 
 # ───── 10 AI EXPLANATION ─────
 with t10:
-    code = all_sources[0]
-
     if st.button("Explain Code"):
-        st.write(explain_code(code))
+        explanation = explain_code(all_sources[0])
+        st.write(explanation)
 
 
-# ───── 11 MULTI FILE ANALYSIS (NEW FEATURE) ─────
+# ───── 11 MULTI FILE ANALYSIS ─────
 with t11:
-
     st.markdown("## 🌐 Multi-file Cross Module Analysis")
 
     if st.button("Run Full Project Analysis 🚀"):
@@ -247,6 +263,7 @@ with t11:
             st.success("No circular dependencies found")
 
         st.success(f"Files: {len(file_paths)} | Nodes: {G.number_of_nodes()} | Edges: {G.number_of_edges()}")
+<<<<<<< HEAD
 with t12:
     if st.button("Detect Code Smells"):
         result = detect_smells(all_sources[0])
@@ -280,6 +297,12 @@ with t13:
                 st.info(f"{vuln['emoji']} **{vuln['type']}** [{vuln['severity']}] at line {vuln['line']} — {vuln['detail']}")
 # ───── 14 CODE REVIEW BOT ─────
 with t14:
+=======
+
+
+# ───── 12 CODE REVIEW BOT ─────
+with t12:
+>>>>>>> f9aeed17c94bfbbbadc766832171258103dd1e7b
     st.markdown("## 👨‍💻 AI Code Review Bot")
 
     option = st.selectbox("Choose code", ["Full Code", "Paste Custom Code"])
@@ -294,8 +317,13 @@ with t14:
             st.write(review)
 
 
+<<<<<<< HEAD
 # ───── 15 TECHNICAL DEBT ─────
 with t15:
+=======
+# ───── 13 TECHNICAL DEBT ─────
+with t13:
+>>>>>>> f9aeed17c94bfbbbadc766832171258103dd1e7b
 
     st.markdown("## 💰 Technical Debt Calculator")
 
@@ -313,4 +341,16 @@ with t15:
         st.write(f"Functions: {result['functions']}")
         st.write(f"Classes: {result['classes']}")
         st.write(f"Complexity Penalty: {result['complexity_penalty']} hrs")
+<<<<<<< HEAD
         st.write(f"Long Function Penalty: {result['long_function_penalty']} hrs")
+=======
+        st.write(f"Long Function Penalty: {result['long_function_penalty']} hrs")
+
+
+# ───── CLEANUP ─────
+for path in file_paths:
+    try:
+        os.unlink(path)
+    except:
+        pass
+>>>>>>> f9aeed17c94bfbbbadc766832171258103dd1e7b
