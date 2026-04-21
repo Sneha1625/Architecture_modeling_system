@@ -36,7 +36,7 @@ from features.techdebt import calculate_technical_debt
 
 # ───── UI ─────
 st.set_page_config(page_title="AI Code Analyzer", layout="wide")
-st.title("🧠 AI Code Analyzer (11 Features)")
+st.title("🧠 AI Code Analyzer ")
 # ───── SCROLLABLE TABS CSS ─────
 st.markdown("""
 <style>
