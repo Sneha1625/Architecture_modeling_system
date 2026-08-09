@@ -1,118 +1,297 @@
-import os
-from collections import Counter
-from itertools import combinations
+"""
+Git history logical coupling analysis.
 
-from git import Repo
+The Streamlit app clones a GitHub repository first and passes the
+local clone path to mine_logical_coupling().
+"""
+
+from itertools import combinations
+from pathlib import Path
+
+from git import Repo, InvalidGitRepositoryError, NoSuchPathError
 
 
 def mine_logical_coupling(repo_path, min_commits=2):
     """
-    Analyze Git history and find files that frequently
-    change together.
+    Analyze a Git repository's history and find files that are
+    frequently changed together.
 
-    Returns a list of file pairs with coupling statistics.
+    Parameters
+    ----------
+    repo_path : str
+        Local path to a Git repository.
+
+    min_commits : int
+        Minimum number of commits in which two files must be changed
+        together before they are considered logically coupled.
+
+    Returns
+    -------
+    dict
+        Contains:
+        - commits_analyzed
+        - files_analyzed
+        - couplings
     """
 
-    if not os.path.exists(os.path.join(repo_path, ".git")):
-        raise ValueError("The selected folder is not a Git repository.")
+    # ---------------------------------------------------------
+    # Convert repository path to an absolute Path
+    # ---------------------------------------------------------
 
-    repo = Repo(repo_path)
+    repo_path = Path(repo_path).resolve()
 
-    pair_counter = Counter()
-    file_counter = Counter()
+    # ---------------------------------------------------------
+    # Open Git repository
+    # ---------------------------------------------------------
+
+    try:
+        repo = Repo(str(repo_path))
+
+    except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+        raise ValueError(
+            f"Not a valid Git repository: {repo_path}"
+        ) from exc
+
+    if repo.bare:
+        raise ValueError(
+            "The Git repository is bare."
+        )
+
+    # ---------------------------------------------------------
+    # Data structures
+    # ---------------------------------------------------------
+
+    pair_counts = {}
+
+    file_commit_counts = {}
+
+    all_files = set()
 
     commits_analyzed = 0
 
-    # Walk through Git history
-    for commit in repo.iter_commits():
+    # ---------------------------------------------------------
+    # Analyze Git history
+    # ---------------------------------------------------------
+    #
+    # --all means all commits reachable from the repository's
+    # refs are considered.
+    #
+    # This repository was cloned from the GitHub URL supplied
+    # by the user in Streamlit.
+    # ---------------------------------------------------------
+
+    for commit in repo.iter_commits("--all"):
 
         changed_files = set()
 
         try:
-            # Initial commit has no parent
-            if not commit.parents:
-                for item in commit.tree.traverse():
-                    if item.type == "blob":
-                        changed_files.add(item.path)
 
-            else:
+            # -------------------------------------------------
+            # Normal commit
+            # -------------------------------------------------
+
+            if commit.parents:
+
                 parent = commit.parents[0]
 
-                diffs = parent.diff(commit)
+                for diff in parent.diff(
+                    commit,
+                    create_patch=False
+                ):
 
-                for diff in diffs:
-
+                    # File before the change
                     if diff.a_path:
-                        changed_files.add(diff.a_path)
 
+                        changed_files.add(
+                            Path(
+                                diff.a_path
+                            ).as_posix()
+                        )
+
+                    # File after the change
                     if diff.b_path:
-                        changed_files.add(diff.b_path)
+
+                        changed_files.add(
+                            Path(
+                                diff.b_path
+                            ).as_posix()
+                        )
+
+            # -------------------------------------------------
+            # Initial commit
+            # -------------------------------------------------
+
+            else:
+
+                for item in commit.tree.traverse():
+
+                    if item.type == "blob":
+
+                        changed_files.add(
+                            Path(
+                                item.path
+                            ).as_posix()
+                        )
 
         except Exception:
+            # Skip commits that cannot be processed.
             continue
 
-        # Ignore commits that don't contain useful file changes
-        if len(changed_files) < 2:
+        # -----------------------------------------------------
+        # Ignore commits without changed files
+        # -----------------------------------------------------
+
+        if not changed_files:
             continue
 
         commits_analyzed += 1
 
-        # Count how often each file appears
-        for file_path in changed_files:
-            file_counter[file_path] += 1
+        # Add files to overall file set
+        all_files.update(
+            changed_files
+        )
 
-        # Count file pairs that change together
+        # -----------------------------------------------------
+        # Count how many commits changed each file
+        # -----------------------------------------------------
+
+        for file_path in changed_files:
+
+            file_commit_counts[file_path] = (
+                file_commit_counts.get(
+                    file_path,
+                    0
+                ) + 1
+            )
+
+        # -----------------------------------------------------
+        # Count file pairs changed in the same commit
+        # -----------------------------------------------------
+
         for file_a, file_b in combinations(
             sorted(changed_files),
             2
         ):
-            pair_counter[(file_a, file_b)] += 1
 
-    results = []
+            pair = (
+                file_a,
+                file_b
+            )
 
-    for (file_a, file_b), together_count in pair_counter.items():
+            pair_counts[pair] = (
+                pair_counts.get(
+                    pair,
+                    0
+                ) + 1
+            )
 
-        file_a_count = file_counter[file_a]
-        file_b_count = file_counter[file_b]
+    # ---------------------------------------------------------
+    # Calculate logical coupling
+    # ---------------------------------------------------------
 
-        # Ignore very weak relationships
-        if together_count < min_commits:
+    couplings = []
+
+    for (
+        file_a,
+        file_b
+    ), co_change_count in pair_counts.items():
+
+        # Only consider pairs changed together at least
+        # min_commits times.
+        if co_change_count < min_commits:
             continue
 
-        # Jaccard-style coupling score
-        union_count = (
-            file_a_count
-            + file_b_count
-            - together_count
+        file_a_commits = file_commit_counts.get(
+            file_a,
+            0
         )
 
-        if union_count == 0:
+        file_b_commits = file_commit_counts.get(
+            file_b,
+            0
+        )
+
+        # Use the less frequently changed file as denominator.
+        denominator = min(
+            file_a_commits,
+            file_b_commits
+        )
+
+        if denominator == 0:
             continue
 
+        # -----------------------------------------------------
+        # Coupling score
+        # -----------------------------------------------------
+        #
+        # Example:
+        #
+        # analyzer.py changed in 3 commits
+        # parser.py changed in 3 commits
+        # changed together in 3 commits
+        #
+        # score = 3 / 3 * 100 = 100%
+        # -----------------------------------------------------
+
         coupling_score = (
-            together_count / union_count
+            co_change_count
+            / denominator
         ) * 100
 
-        results.append({
-            "file_a": file_a,
-            "file_b": file_b,
-            "co_change_count": together_count,
-            "file_a_commits": file_a_count,
-            "file_b_commits": file_b_count,
-            "coupling_score": round(coupling_score, 2)
-        })
+        coupling_score = min(
+            coupling_score,
+            100.0
+        )
 
-    # Strongest relationships first
-    results.sort(
-        key=lambda x: (
-            x["coupling_score"],
-            x["co_change_count"]
+        couplings.append(
+            {
+                "file_a": file_a,
+
+                "file_b": file_b,
+
+                "coupling_score": round(
+                    coupling_score,
+                    1
+                ),
+
+                "co_change_count": (
+                    co_change_count
+                ),
+
+                "file_a_commits": (
+                    file_a_commits
+                ),
+
+                "file_b_commits": (
+                    file_b_commits
+                ),
+            }
+        )
+
+    # ---------------------------------------------------------
+    # Sort strongest relationships first
+    # ---------------------------------------------------------
+
+    couplings.sort(
+        key=lambda item: (
+            item["coupling_score"],
+            item["co_change_count"]
         ),
         reverse=True
     )
 
+    # ---------------------------------------------------------
+    # Return results to Streamlit
+    # ---------------------------------------------------------
+
     return {
-        "commits_analyzed": commits_analyzed,
-        "files_analyzed": len(file_counter),
-        "couplings": results
+        "commits_analyzed": (
+            commits_analyzed
+        ),
+
+        "files_analyzed": (
+            len(all_files)
+        ),
+
+        "couplings": couplings,
     }

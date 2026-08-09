@@ -99,8 +99,13 @@ def find_python_files(repo_path):
 
 def get_repository_info(repo_path):
     """
-    Get basic information about the cloned repository.
+    Get basic information and Git history
+    about the cloned repository.
     """
+
+    # --------------------------------------------------
+    # Python file statistics
+    # --------------------------------------------------
 
     python_files = find_python_files(
         repo_path
@@ -126,8 +131,123 @@ def get_repository_info(repo_path):
         except Exception:
             continue
 
+    # --------------------------------------------------
+    # Open Git repository
+    # --------------------------------------------------
+
+    try:
+
+        repo = Repo(
+            repo_path
+        )
+
+        # Repository name
+        repository_name = os.path.basename(
+            repo_path
+        )
+
+        # Current branch
+        try:
+            current_branch = repo.active_branch.name
+        except Exception:
+            current_branch = "Unknown"
+
+        # --------------------------------------------------
+        # Get commit history
+        # --------------------------------------------------
+
+        commits = []
+
+        for commit in repo.iter_commits(
+            max_count=10
+        ):
+
+            # Get changed files
+            changed_files = []
+
+            try:
+
+                if commit.parents:
+
+                    parent = commit.parents[0]
+
+                    diff = parent.diff(
+                        commit
+                    )
+
+                    for item in diff:
+
+                        if item.a_path:
+                            changed_files.append(
+                                item.a_path
+                            )
+
+                        elif item.b_path:
+                            changed_files.append(
+                                item.b_path
+                            )
+
+                else:
+                    # Initial commit
+                    changed_files = list(
+                        commit.stats.files.keys()
+                    )
+
+            except Exception:
+                changed_files = []
+
+            commits.append(
+                {
+                    "hash": commit.hexsha[:7],
+                    "message": commit.message.strip(),
+                    "author": (
+                        commit.author.name
+                        if commit.author
+                        else "Unknown"
+                    ),
+                    "date": commit.committed_datetime.strftime(
+                        "%Y-%m-%d %H:%M"
+                    ),
+                    "files_changed": len(
+                        changed_files
+                    ),
+                    "changed_files": changed_files
+                }
+            )
+
+        # --------------------------------------------------
+        # Total commits
+        # --------------------------------------------------
+
+        try:
+            total_commits = sum(
+                1 for _ in repo.iter_commits()
+            )
+        except Exception:
+            total_commits = 0
+
+    except Exception:
+
+        repository_name = os.path.basename(
+            repo_path
+        )
+
+        current_branch = "Unknown"
+        total_commits = 0
+        commits = []
+
+    # --------------------------------------------------
+    # Return repository information
+    # --------------------------------------------------
+
     return {
-        "python_files": len(python_files),
+        "repository_name": repository_name,
+        "branch": current_branch,
+        "total_commits": total_commits,
+        "commits": commits,
+        "python_files": len(
+            python_files
+        ),
         "total_lines": total_lines,
         "repository_path": repo_path
     }

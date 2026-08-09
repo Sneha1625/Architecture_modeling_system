@@ -14,6 +14,8 @@ import os
 import tempfile
 import networkx as nx
 import plotly.graph_objects as go
+from git import Repo
+from pathlib import Path
 from dotenv import load_dotenv
 from features.github_analyzer import (
     clone_github_repository,
@@ -1101,6 +1103,80 @@ with t13:
 
 # ───── 14 GITHUB REPOSITORY ANALYZER ─────
 
+
+def get_github_repository_overview(repo_path, github_url):
+    """Return basic repository information and recent commit history."""
+    repo = Repo(repo_path)
+
+    # Repository name
+    repo_name = Path(repo_path).name
+
+    # Extract owner/repository from the GitHub URL when possible.
+    clean_url = github_url.strip().rstrip("/")
+    if clean_url.endswith(".git"):
+        clean_url = clean_url[:-4]
+
+    parts = clean_url.split("/")
+    owner = "Unknown"
+    if len(parts) >= 2 and "github.com" in clean_url.lower():
+        owner = parts[-2]
+        repo_name = parts[-1] or repo_name
+
+    # Current/default branch. A cloned repository normally checks out
+    # the repository's default branch, so this is the branch being analyzed.
+    try:
+        branch = repo.active_branch.name
+    except TypeError:
+        branch = "Detached HEAD"
+    except Exception:
+        branch = "Unknown"
+
+    return {
+        "name": repo_name,
+        "owner": owner,
+        "branch": branch,
+        "url": github_url.strip(),
+        "commit_count": sum(1 for _ in repo.iter_commits("--all")),
+    }
+
+
+def get_recent_commits(repo_path, limit=10):
+    """Return recent commits with author, date, message and changed files."""
+    repo = Repo(repo_path)
+    commits = []
+
+    for commit in repo.iter_commits("--all", max_count=limit):
+        changed_files = set()
+
+        try:
+            if commit.parents:
+                parent = commit.parents[0]
+                for diff in parent.diff(commit, create_patch=False):
+                    if diff.a_path:
+                        changed_files.add(diff.a_path)
+                    if diff.b_path:
+                        changed_files.add(diff.b_path)
+            else:
+                # Initial commit: list all files present in the commit.
+                for item in commit.tree.traverse():
+                    if item.type == "blob":
+                        changed_files.add(item.path)
+        except Exception:
+            # Keep the commit visible even if a particular diff cannot be read.
+            changed_files = set()
+
+        commits.append({
+            "hash": commit.hexsha[:7],
+            "message": commit.message.strip().splitlines()[0] if commit.message.strip() else "No commit message",
+            "author": commit.author.name or "Unknown",
+            "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M"),
+            "files_changed": len(changed_files),
+            "changed_files": sorted(changed_files),
+        })
+
+    return commits
+
+
 with t14:
 
     st.markdown("## 🐙 GitHub Repository Analyzer")
@@ -1139,15 +1215,49 @@ with t14:
                     "✅ Repository cloned successfully!"
                 )
 
-                # Repository information
+                # -------------------------------------------------
+                # Repository overview
+                # -------------------------------------------------
                 info = get_repository_info(
                     repo_path
+                )
+
+                overview = get_github_repository_overview(
+                    repo_path,
+                    github_url
                 )
 
                 st.markdown(
                     "### 📊 Repository Overview"
                 )
 
+                o1, o2, o3, o4 = st.columns(4)
+
+                o1.metric(
+                    "Repository",
+                    overview["name"]
+                )
+
+                o2.metric(
+                    "Owner",
+                    overview["owner"]
+                )
+
+                o3.metric(
+                    "Branch",
+                    overview["branch"]
+                )
+
+                o4.metric(
+                    "Total Commits",
+                    overview["commit_count"]
+                )
+
+                st.write(
+                    f"**GitHub URL:** {overview['url']}"
+                )
+
+                # Existing repository statistics
                 c1, c2 = st.columns(2)
 
                 c1.metric(
@@ -1160,7 +1270,60 @@ with t14:
                     info["total_lines"]
                 )
 
+                # -------------------------------------------------
+                # Commit history
+                # -------------------------------------------------
+                st.markdown(
+                    "### 🕐 Recent Commit History"
+                )
+
+                st.caption(
+                    "Recent commits from the GitHub repository, "
+                    "including author, date, and number of files changed."
+                )
+
+                recent_commits = get_recent_commits(
+                    repo_path,
+                    limit=10
+                )
+
+                if not recent_commits:
+                    st.info(
+                        "No commit history was found in this repository."
+                    )
+                else:
+                    for commit in recent_commits:
+                        with st.expander(
+                            f"{commit['hash']} — {commit['message']}"
+                        ):
+                            cc1, cc2, cc3 = st.columns(3)
+
+                            cc1.write(
+                                f"**Author:** {commit['author']}"
+                            )
+
+                            cc2.write(
+                                f"**Date:** {commit['date']}"
+                            )
+
+                            cc3.write(
+                                f"**Files Changed:** {commit['files_changed']}"
+                            )
+
+                            if commit["changed_files"]:
+                                st.write("**Changed Files:**")
+                                for changed_file in commit["changed_files"]:
+                                    st.write(
+                                        f"📄 {changed_file}"
+                                    )
+                            else:
+                                st.write(
+                                    "No changed-file information available."
+                                )
+
+                # -------------------------------------------------
                 # List Python files
+                # -------------------------------------------------
                 python_files = find_python_files(
                     repo_path
                 )
@@ -1169,88 +1332,140 @@ with t14:
                     "### 📁 Python Files Found"
                 )
 
-                for file_path in python_files:
-
-                    relative_path = os.path.relpath(
-                        file_path,
-                        repo_path
+                if not python_files:
+                    st.info(
+                        "No Python files were found in this repository."
                     )
+                else:
+                    for file_path in python_files:
 
-                    st.write(
-                        f"📄 {relative_path}"
-                    )
+                        relative_path = os.path.relpath(
+                            file_path,
+                            repo_path
+                        )
+
+                        st.write(
+                            f"📄 {relative_path}"
+                        )
 
             except Exception as e:
 
                 st.error(
                     f"❌ Repository analysis failed: {e}"
                 )
+
 with t15:
+
     st.markdown("## 🔀 Git History — Logical Coupling")
 
-st.write(
-    "Find files that frequently change together "
-    "even when they have no direct dependency."
-)
+    st.write(
+        "Enter a GitHub repository URL to analyze its Git history "
+        "and find files that frequently change together."
+    )
 
-if st.button("Analyze Git History 🔍"):
+    logical_github_url = st.text_input(
+        "GitHub Repository URL",
+        placeholder="https://github.com/username/repository",
+        key="logical_coupling_github_url"
+    )
 
-    try:
+    if st.button(
+        "🔍 Analyze Git History",
+        key="logical_coupling_analyze"
+    ):
 
-        result = mine_logical_coupling(
-            BASE_DIR
-        )
+        if not logical_github_url.strip():
 
-        st.metric(
-            "Commits Analyzed",
-            result["commits_analyzed"]
-        )
-
-        st.metric(
-            "Files Analyzed",
-            result["files_analyzed"]
-        )
-
-        couplings = result["couplings"]
-
-        if not couplings:
-
-            st.info(
-                "No significant logical coupling found."
+            st.warning(
+                "Please enter a GitHub repository URL."
             )
 
         else:
 
-            st.write(
-                "### 🔗 Strongest Hidden Relationships"
-            )
+            try:
 
-            for coupling in couplings[:20]:
+                with st.spinner(
+                    "Cloning GitHub repository and analyzing Git history..."
+                ):
 
-                score = coupling["coupling_score"]
+                    # IMPORTANT: Logical coupling is calculated from
+                    # the Git history of the GitHub repository entered
+                    # by the user, not from uploaded Python files.
+                    repo_path = clone_github_repository(
+                        logical_github_url.strip()
+                    )
 
-                st.markdown(
-                    f"""
-                    **{coupling['file_a']}**
-                    ↔
-                    **{coupling['file_b']}**
+                    result = mine_logical_coupling(
+                        repo_path
+                    )
 
-                    - Coupling Score: **{score}%**
-                    - Changed Together: **{coupling['co_change_count']} times**
-                    - {coupling['file_a']} commits:
-                      **{coupling['file_a_commits']}**
-                    - {coupling['file_b']} commits:
-                      **{coupling['file_b_commits']}**
-                    """
+                st.success(
+                    "✅ GitHub repository cloned and Git history analyzed."
                 )
 
-                st.divider()
+                st.caption(
+                    f"Repository analyzed: {logical_github_url.strip()}"
+                )
 
-    except Exception as e:
+                c1, c2 = st.columns(2)
 
-        st.error(
-            f"Git history analysis failed: {e}"
-        )
+                c1.metric(
+                    "Commits Analyzed",
+                    result["commits_analyzed"]
+                )
+
+                c2.metric(
+                    "Files Analyzed",
+                    result["files_analyzed"]
+                )
+
+                couplings = result["couplings"]
+
+                if not couplings:
+
+                    st.info(
+                        "No significant logical coupling found in the "
+                        "Git history of this repository."
+                    )
+
+                else:
+
+                    st.write(
+                        "### 🔗 Strongest Hidden Relationships"
+                    )
+
+                    st.caption(
+                        "These file pairs were frequently changed together "
+                        "in the repository's Git history."
+                    )
+
+                    for coupling in couplings[:20]:
+
+                        score = coupling["coupling_score"]
+
+                        st.markdown(
+                            f"""
+                            **{coupling['file_a']}**
+                            ↔
+                            **{coupling['file_b']}**
+
+                            - Coupling Score: **{score}%**
+                            - Changed Together: **{coupling['co_change_count']} times**
+                            - {coupling['file_a']} commits:
+                              **{coupling['file_a_commits']}**
+                            - {coupling['file_b']} commits:
+                              **{coupling['file_b_commits']}**
+                            """
+                        )
+
+                        st.divider()
+
+            except Exception as e:
+
+                st.error(
+                    f"❌ Git history analysis failed: {e}"
+                )
+
 
 # ─────────────────────────────────────────────────────────────
 # CLEANUP TEMPORARY FILES
