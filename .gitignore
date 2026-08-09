@@ -3,4 +3,5 @@ outputs/
 __pycache__/
 *.pyc
 .env
+src/.env
 .idea/

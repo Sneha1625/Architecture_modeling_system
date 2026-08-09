@@ -1,0 +1,11 @@
+streamlit
+networkx
+matplotlib
+plotly
+python-dotenv
+groq
+sentence-transformers
+scikit-learn
+GitPython
+python-louvain
+pytest

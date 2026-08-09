@@ -69,23 +69,11 @@ def mine_logical_coupling(repo_path, min_commits=2):
 
     commits_analyzed = 0
 
-    # ---------------------------------------------------------
-    # Analyze Git history
-    # ---------------------------------------------------------
-    #
-    # --all means all commits reachable from the repository's
-    # refs are considered.
-    #
-    # This repository was cloned from the GitHub URL supplied
-    # by the user in Streamlit.
-    # ---------------------------------------------------------
-
-    for commit in repo.iter_commits("--all"):
+    for commit in repo.iter_commits():
 
         changed_files = set()
 
         try:
-
             # -------------------------------------------------
             # Normal commit
             # -------------------------------------------------
