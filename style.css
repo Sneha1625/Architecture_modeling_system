@@ -1,0 +1,198 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Poppins', sans-serif;
+    }
+
+    /* ---------- App background ---------- */
+    .stApp {
+        background: linear-gradient(160deg, #0f0c29 0%, #302b63 45%, #24243e 100%);
+    }
+
+    /* ---------- Hero banner ---------- */
+    .hero-banner {
+        background: linear-gradient(120deg, #ff6a00, #ee0979 35%, #8e2de2 70%, #4a00e0 100%);
+        background-size: 300% 300%;
+        animation: gradientShift 10s ease infinite;
+        padding: 2.2rem 2.5rem;
+        border-radius: 22px;
+        margin-bottom: 1.6rem;
+        box-shadow: 0 8px 32px rgba(142, 45, 226, 0.35);
+    }
+
+    @keyframes gradientShift {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    .hero-title {
+        font-size: 2.4rem;
+        font-weight: 800;
+        color: #000;
+        margin: 0;
+        text-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    }
+
+    .hero-subtitle {
+        font-size: 1.02rem;
+        color: rgba(255,255,255,0.92);
+        margin-top: 0.4rem;
+        font-weight: 400;
+    }
+
+    .hero-page-badge {
+        display: inline-block;
+        margin-top: 0.9rem;
+        padding: 0.35rem 1rem;
+        background: rgba(255,255,255,0.18);
+        border: 1px solid rgba(255,255,255,0.35);
+        border-radius: 999px;
+        color: #000;
+        font-weight: 600;
+        font-size: 0.95rem;
+        backdrop-filter: blur(4px);
+    }
+
+    /* ---------- Sidebar ---------- */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1b1240 0%, #2d1b56 55%, #401b6c 100%);
+        border-right: 1px solid rgba(255,255,255,0.08);
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #f2eefc !important;
+    }
+
+    .sidebar-logo {
+        font-size: 1.5rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #ff8a00, #e52e71, #8e2de2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        padding: 0.4rem 0 0.2rem 0;
+    }
+
+    .sidebar-section-label {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: rgba(255,255,255,0.55) !important;
+        margin: 1.1rem 0 0.3rem 0;
+    }
+
+    /* Sidebar radio -> pill-style nav menu */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+        padding: 0.55rem 0.9rem;
+        margin-bottom: 0.35rem;
+        width: 100%;
+        transition: all 0.15s ease-in-out;
+        cursor: pointer;
+    }
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: linear-gradient(90deg, rgba(255,138,0,0.25), rgba(142,45,226,0.25));
+        border-color: rgba(255,255,255,0.25);
+        transform: translateX(3px);
+    }
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"],
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background: linear-gradient(90deg, #ff8a00, #e52e71, #8e2de2);
+        border-color: transparent;
+        box-shadow: 0 4px 14px rgba(229, 46, 113, 0.4);
+    }
+
+    /* ---------- Metric cards ---------- */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, rgba(255,138,0,0.16), rgba(142,45,226,0.16));
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 16px;
+        padding: 0.9rem 1rem 0.6rem 1rem;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+    }
+
+    div[data-testid="stMetric"] label {
+        color: rgba(255,255,255,0.75) !important;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #000 !important;
+        font-weight: 700 !important;
+    }
+
+    /* ---------- Buttons ---------- */
+    .stButton > button, .stDownloadButton > button {
+        background: linear-gradient(90deg, #ff6a00, #ee0979, #8e2de2);
+        background-size: 200% auto;
+        color: #000;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.55rem 1.4rem;
+        transition: all 0.25s ease-in-out;
+        box-shadow: 0 4px 14px rgba(238, 9, 121, 0.35);
+    }
+
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        background-position: right center;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(142, 45, 226, 0.5);
+        color: #fff;
+    }
+
+    /* ---------- Tabs (still used inside some pages) ---------- */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(255,255,255,0.06);
+        border-radius: 10px 10px 0 0;
+        padding: 0.5rem 1rem;
+        color: rgba(255,255,255,0.75);
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(90deg, #ff8a00, #e52e71);
+        color: #fff !important;
+    }
+
+    /* ---------- Headers / text ---------- */
+    h1, h2, h3, h4, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        color: #ffffff;
+    }
+
+    p, li,  label, .stMarkdown, .stCaption {
+        color: rgba(255,255,255,0.88);
+    }
+
+    /* ---------- Dataframe / tables ---------- */
+    div[data-testid="stDataFrame"] {
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* ---------- File uploader ---------- */
+    section[data-testid="stFileUploaderDropzone"] {
+        background: rgba(255,255,255,0.05);
+        border: 1.5px dashed rgba(255,255,255,0.3);
+        border-radius: 14px;
+    }
+
+    /* ---------- Divider ---------- */
+    hr {
+        border-color: rgba(255,255,255,0.15) !important;
+    }
+
+    /* ---------- Expander ---------- */
+    .streamlit-expanderHeader {
+        background: rgba(255,255,255,0.06);
+        border-radius: 10px;
+        color: #fff !important;
+    }

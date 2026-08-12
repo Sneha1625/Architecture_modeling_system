@@ -13,6 +13,11 @@ with Commit History
 # ─────────────────────────────────────────────────────────────
 from features.coupling_miner import mine_logical_coupling
 import streamlit as st
+with open("style.css") as f:
+    st.markdown(
+        f"<style>{f.read()}</style>",
+        unsafe_allow_html=True
+    )
 import sys
 import os
 import tempfile
