@@ -614,18 +614,761 @@ if page == "🌳 AST":
     st.json(parsed_files)
  
  
-# ─────────────────────────────────────────────────────────────
+# ============================================================
 # 3. AI ANALYSIS
-# ─────────────────────────────────────────────────────────────
- 
+# ============================================================
+
 if page == "🤖 AI Analysis":
+
+    # --------------------------------------------------------
+    # CHECK WHETHER FILES ARE AVAILABLE
+    # --------------------------------------------------------
+
     require_uploaded_files()
 
     st.header("🤖 AI Code Analysis")
+
+    st.caption(
+        "AI-powered analysis of syntax, semantics, logic, "
+        "runtime risks, security, performance, code quality "
+        "and possible improvements."
+    )
+
+    # --------------------------------------------------------
+    # FILE SELECTION
+    # --------------------------------------------------------
+
+    file_names = []
+
+    for item in uploaded_files:
+
+        if hasattr(item, "name"):
+            file_names.append(item.name)
+
+        elif isinstance(item, dict):
+            file_names.append(item.get("name", "Unknown File"))
+
+        else:
+            file_names.append(str(item))
+
+    if not file_names:
+        st.warning(
+            "📂 No Python files are available for analysis."
+        )
+        st.stop()
+
+    selected_index = st.selectbox(
+        "📄 Select file to analyze",
+        range(len(file_names)),
+        format_func=lambda i: file_names[i],
+        key="ai_selected_file",
+    )
+
+    selected_file = file_names[selected_index]
+
+    # --------------------------------------------------------
+    # GET SOURCE CODE
+    # --------------------------------------------------------
+
+    selected_code = all_sources[selected_index]
+
+    # --------------------------------------------------------
+    # GET PARSED / AST DATA
+    # --------------------------------------------------------
+
+    selected_parsed = parsed_files[selected_index]
+
+    # --------------------------------------------------------
+    # FILE INFORMATION CARD
+    # --------------------------------------------------------
+
+    st.markdown(
+        f"""
+        <div class="ai-file-card">
+
+            <div class="ai-file-title">
+                📄 {selected_file}
+            </div>
+
+            <div class="ai-file-subtitle">
+                Ready for intelligent AI analysis
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # ANALYSIS BUTTON
+    # --------------------------------------------------------
+
+    analyze_ai = st.button(
+        "🤖 Run Complete AI Analysis",
+        use_container_width=True,
+        type="primary",
+        key="run_complete_ai_analysis",
+    )
+
+    if analyze_ai:
+
+        with st.spinner(
+            "🧠 AI is analyzing your code..."
+        ):
+
+            try:
+
+                result = analyze_parsed_result(
+                    selected_parsed,
+                    selected_code
+                )
+
+                # Store result in Streamlit session
+                # so it survives page reruns.
+
+                st.session_state[
+                    "ai_analysis_result"
+                ] = result
+
+                st.session_state[
+                    "ai_analysis_file"
+                ] = selected_file
+
+                # Store the selected code as well.
+
+                st.session_state[
+                    "ai_analysis_code"
+                ] = selected_code
+
+            except Exception as e:
+
+                st.error(
+                    f"❌ AI analysis failed: {e}"
+                )
+
+                st.exception(e)
+
+                st.stop()
+
+    # --------------------------------------------------------
+    # BEFORE AI ANALYSIS
+    # --------------------------------------------------------
+
+    if "ai_analysis_result" not in st.session_state:
+
+        st.info(
+            "👆 Select a Python file and click "
+            "**Run Complete AI Analysis**."
+        )
+
+        st.markdown(
+            "### 🔍 What will be analyzed"
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+
+            st.markdown(
+                "### 🧠 Semantic Analysis"
+            )
+
+            st.caption(
+                "Understand what the code is intended "
+                "to do and identify meaning-related issues."
+            )
+
+        with c2:
+
+            st.markdown(
+                "### ⚠️ Error & Risk Detection"
+            )
+
+            st.caption(
+                "Look for syntax, runtime, logical, "
+                "security and other potential problems."
+            )
+
+        with c3:
+
+            st.markdown(
+                "### 💡 Improvements"
+            )
+
+            st.caption(
+                "Get AI suggestions for cleaner, safer "
+                "and more maintainable code."
+            )
+
+        st.divider()
+
+        st.markdown(
+            "### 📋 Analysis Categories"
+        )
+
+        category_col1, category_col2 = st.columns(2)
+
+        with category_col1:
+
+            st.markdown(
+                """
+                - 📝 Syntax
+                - 🧠 Semantic
+                - ⚠️ Runtime
+                - 🔀 Logical
+                """
+            )
+
+        with category_col2:
+
+            st.markdown(
+                """
+                - 🔐 Security
+                - ⚡ Performance
+                - 🧹 Code Quality
+                - 💡 Suggestions
+                """
+            )
+
+        st.stop()
+
+    # --------------------------------------------------------
+    # GET SAVED RESULT
+    # --------------------------------------------------------
+
+    result = st.session_state[
+        "ai_analysis_result"
+    ]
+
+    analyzed_file = st.session_state.get(
+        "ai_analysis_file",
+        selected_file
+    )
+
+    analyzed_code = st.session_state.get(
+        "ai_analysis_code",
+        selected_code
+    )
+
+    # --------------------------------------------------------
+    # RESULT HEADER
+    # --------------------------------------------------------
+
+    st.success(
+        f"✅ Analysis completed for `{analyzed_file}`"
+    )
+
+    st.markdown(
+        "## 📊 Analysis Overview"
+    )
+
+    # --------------------------------------------------------
+    # NORMALIZE RESULT
+    # --------------------------------------------------------
+
+    if isinstance(result, dict):
+
+        summary = result.get(
+            "summary",
+            result.get(
+                "analysis",
+                ""
+            )
+        )
+
+        overall_status = result.get(
+            "overall_status",
+            "Not Available"
+        )
+
+        overall_confidence = result.get(
+            "confidence",
+            0
+        )
+
+        issues = result.get(
+            "issues",
+            result.get(
+                "errors",
+                []
+            )
+        )
+
+        suggestions = result.get(
+            "suggestions",
+            result.get(
+                "recommendations",
+                []
+            )
+        )
+
+        explanation = result.get(
+            "explanation",
+            result.get(
+                "details",
+                ""
+            )
+        )
+
+        execution_flow = result.get(
+            "execution_flow",
+            []
+        )
+
+    else:
+
+        summary = str(result)
+
+        overall_status = (
+            "Needs Improvement"
+        )
+
+        overall_confidence = 0
+
+        issues = []
+
+        suggestions = []
+
+        explanation = ""
+
+        execution_flow = []
+
+    # --------------------------------------------------------
+    # MAKE SURE ISSUES ARE LIST
+    # --------------------------------------------------------
+
+    if not isinstance(issues, list):
+        issues = [issues]
+
+    if not isinstance(suggestions, list):
+        suggestions = [suggestions]
+
+    # --------------------------------------------------------
+    # ISSUE COUNTS
+    # --------------------------------------------------------
+
+    total_issues = len(issues)
+
+    total_suggestions = len(
+        suggestions
+    )
+
+    total_lines = len(
+        analyzed_code.splitlines()
+    )
+
+    # --------------------------------------------------------
+    # STATUS
+    # --------------------------------------------------------
+
+    status_text = str(
+        overall_status
+    ).lower()
+
+    if "critical" in status_text:
+
+        status_icon = "🔴"
+
+    elif "improvement" in status_text:
+
+        status_icon = "🟡"
+
+    elif "good" in status_text:
+
+        status_icon = "🟢"
+
+    else:
+
+        status_icon = "🔵"
+
+    # --------------------------------------------------------
+    # OVERVIEW METRICS
+    # --------------------------------------------------------
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+
+        st.metric(
+            "🚨 Issues",
+            total_issues
+        )
+
+    with c2:
+
+        st.metric(
+            "💡 Suggestions",
+            total_suggestions
+        )
+
+    with c3:
+
+        st.metric(
+            "📄 Lines",
+            total_lines
+        )
+
+    with c4:
+
+        st.metric(
+            "🎯 Confidence",
+            f"{overall_confidence}%"
+        )
+
+    # --------------------------------------------------------
+    # STATUS
+    # --------------------------------------------------------
+
+    st.markdown(
+        f"""
+        ### {status_icon} Overall Status
+
+        **{overall_status}**
+        """
+    )
+
+    st.divider()
+
+    # ========================================================
+    # AI SUMMARY
+    # ========================================================
+
+    st.subheader(
+        "🧠 AI Summary"
+    )
+
+    if summary:
+
+        if isinstance(
+            summary,
+            (dict, list)
+        ):
+
+            st.json(summary)
+
+        else:
+
+            st.markdown(
+                str(summary)
+            )
+
+    else:
+
+        st.info(
+            "The AI did not return a separate summary."
+        )
+
+    # ========================================================
+    # ISSUES DETECTED
+    # ========================================================
+
+    st.subheader(
+        "🚨 Issues Detected"
+    )
+
+    if issues:
+
+        for i, issue in enumerate(
+            issues,
+            1
+        ):
+
+            # ----------------------------------------------
+            # STRUCTURED ISSUE
+            # ----------------------------------------------
+
+            if isinstance(
+                issue,
+                dict
+            ):
+
+                issue_type = issue.get(
+                    "type",
+                    "Issue"
+                )
+
+                severity = issue.get(
+                    "severity",
+                    "Medium"
+                )
+
+                line = issue.get(
+                    "line",
+                    issue.get(
+                        "line_number",
+                        "N/A"
+                    )
+                )
+
+                title = issue.get(
+                    "title",
+                    f"Issue {i}"
+                )
+
+                description = issue.get(
+                    "description",
+                    issue.get(
+                        "problem",
+                        "No description provided."
+                    )
+                )
+
+                why = issue.get(
+                    "why",
+                    ""
+                )
+
+                fix = issue.get(
+                    "fix",
+                    issue.get(
+                        "suggestion",
+                        ""
+                    )
+                )
+
+                confidence = issue.get(
+                    "confidence",
+                    0
+                )
+
+                # ------------------------------------------
+                # EXPANDER
+                # ------------------------------------------
+
+                with st.expander(
+                    f"🚨 {title} | "
+                    f"{issue_type} | "
+                    f"{severity} | "
+                    f"Line {line}"
+                ):
+
+                    st.markdown(
+                        f"**Type:** {issue_type}"
+                    )
+
+                    st.markdown(
+                        f"**Severity:** {severity}"
+                    )
+
+                    st.markdown(
+                        f"**Line:** {line}"
+                    )
+
+                    if confidence:
+
+                        st.markdown(
+                            f"**AI Confidence:** "
+                            f"{confidence}%"
+                        )
+
+                    st.markdown(
+                        "### ❌ Problem"
+                    )
+
+                    st.write(
+                        description
+                    )
+
+                    if why:
+
+                        st.markdown(
+                            "### ❓ Why is this a problem?"
+                        )
+
+                        st.write(
+                            why
+                        )
+
+                    if fix:
+
+                        st.markdown(
+                            "### 💡 Suggested Fix"
+                        )
+
+                        st.info(
+                            fix
+                        )
+
+            # ----------------------------------------------
+            # UNSTRUCTURED ISSUE
+            # ----------------------------------------------
+
+            else:
+
+                with st.expander(
+                    f"🚨 Issue {i}"
+                ):
+
+                    st.write(
+                        issue
+                    )
+
+    else:
+
+        st.success(
+            "✅ No issues were identified by the AI."
+        )
+
+    # ========================================================
+    # SUGGESTIONS
+    # ========================================================
+
+    st.subheader(
+        "💡 AI Improvement Suggestions"
+    )
+
+    if suggestions:
+
+        for i, suggestion in enumerate(
+            suggestions,
+            1
+        ):
+
+            if isinstance(
+                suggestion,
+                dict
+            ):
+
+                title = suggestion.get(
+                    "title",
+                    f"Suggestion {i}"
+                )
+
+                description = suggestion.get(
+                    "description",
+                    suggestion.get(
+                        "suggestion",
+                        "No description provided."
+                    )
+                )
+
+                priority = suggestion.get(
+                    "priority",
+                    "Medium"
+                )
+
+                with st.expander(
+                    f"💡 {title} | "
+                    f"Priority: {priority}"
+                ):
+
+                    st.write(
+                        description
+                    )
+
+            else:
+
+                st.markdown(
+                    f"**{i}.** {suggestion}"
+                )
+
+    else:
+
+        st.info(
+            "No improvement suggestions "
+            "were returned."
+        )
+
+    # ========================================================
+    # EXECUTION FLOW
+    # ========================================================
+
+    if execution_flow:
+
+        st.subheader(
+            "▶️ AI Execution Flow"
+        )
+
+        for i, step in enumerate(
+            execution_flow,
+            1
+        ):
+
+            st.markdown(
+                f"""
+                **Step {i}**
+
+                {step}
+                """
+            )
+
+    # ========================================================
+    # EXPLANATION
+    # ========================================================
+
+    if explanation:
+
+        st.subheader(
+            "📖 AI Explanation"
+        )
+
+        with st.expander(
+            "Show detailed explanation",
+            expanded=True
+        ):
+
+            if isinstance(
+                explanation,
+                (dict, list)
+            ):
+
+                st.json(
+                    explanation
+                )
+
+            else:
+
+                st.markdown(
+                    str(explanation)
+                )
+
+    # ========================================================
+    # SOURCE CODE
+    # ========================================================
+
+    st.subheader(
+        "💻 Analyzed Source Code"
+    )
+
+    with st.expander(
+        "View source code"
+    ):
+
+        st.code(
+            analyzed_code,
+            language="python"
+        )
+
+    # ========================================================
+    # RUN AGAIN
+    # ========================================================
+
+    st.divider()
+
+    if st.button(
+        "🔄 Clear AI Analysis & Run Again",
+        key="clear_ai_analysis",
+        use_container_width=True
+    ):
+
+        st.session_state.pop(
+            "ai_analysis_result",
+            None
+        )
+
+        st.session_state.pop(
+            "ai_analysis_file",
+            None
+        )
+
+        st.session_state.pop(
+            "ai_analysis_code",
+            None
+        )
+
+        st.rerun()
  
-    if st.button("Run AI Analysis", key="ai_analysis"):
-        result = analyze_parsed_result(parsed_files[0], all_sources[0])
-        st.write(result)
+
  
  
 # ─────────────────────────────────────────────────────────────

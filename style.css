@@ -283,3 +283,81 @@ div[data-testid="stMetricValue"] {
 div[data-testid="stMetricLabel"] {
     color: #444444 !important;
 }
+
+/* ==========================================================
+   AI ANALYSIS
+   ========================================================== */
+
+.ai-file-card {
+    background: linear-gradient(
+        135deg,
+        #ffffff 0%,
+        #f5f5fa 100%
+    );
+
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+
+    padding: 1rem 1.2rem;
+    margin: 1rem 0 1.2rem 0;
+
+    box-shadow:
+        0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+.ai-file-title {
+    color: #000000 !important;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.ai-file-subtitle {
+    color: #666666 !important;
+    font-size: 0.85rem;
+    margin-top: 0.2rem;
+}
+
+
+/* AI Analysis headings */
+
+.ai-analysis-title {
+    color: #000000 !important;
+}
+
+
+/* Expanders */
+
+div[data-testid="stExpander"] {
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    margin-bottom: 0.6rem;
+}
+
+
+/* Metrics */
+
+div[data-testid="stMetric"] {
+    background: #ffffff;
+    border-radius: 14px;
+
+    border: 1px solid rgba(0, 0, 0, 0.08);
+
+    padding: 0.8rem;
+
+    box-shadow:
+        0 3px 12px rgba(0, 0, 0, 0.06);
+}
+
+
+/* Metric value */
+
+div[data-testid="stMetricValue"] {
+    color: #000000 !important;
+}
+
+
+/* Metric label */
+
+div[data-testid="stMetricLabel"] {
+    color: #444444 !important;
+}
