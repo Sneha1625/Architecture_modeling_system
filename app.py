@@ -13,6 +13,7 @@ from features.risk_predictor import compute_risk_scores
 from features.execution_tracer import trace_static_execution_path, draw_execution_step
 from features.NIcodesearch import CodeSearchEngine
 from features.impact_predictor import predict_change_impact
+from features.ast_structural_clones import find_structural_clones
 from dotenv import load_dotenv
 from features.github_analyzer import (
     clone_github_repository,
@@ -604,7 +605,7 @@ if page == "💻 Code":
  
  
 # ─────────────────────────────────────────────────────────────
-# 2. AST
+# 2. AI ANALYSIS
 # ─────────────────────────────────────────────────────────────
  
 if page == "🌳 AST":
@@ -1372,7 +1373,7 @@ if page == "🤖 AI Analysis":
  
  
 # ─────────────────────────────────────────────────────────────
-# 4. INTERACTIVE ARCHITECTURE
+# 3. INTERACTIVE ARCHITECTURE
 # ─────────────────────────────────────────────────────────────
  
 if page == "🏗️ Architecture":
@@ -1387,7 +1388,7 @@ if page == "🏗️ Architecture":
  
  
 # ─────────────────────────────────────────────────────────────
-# 5. EMBEDDINGS
+# 4. EMBEDDINGS
 # ─────────────────────────────────────────────────────────────
  
 if page == "🔢 Embeddings":
@@ -1401,7 +1402,7 @@ if page == "🔢 Embeddings":
  
  
 # ─────────────────────────────────────────────────────────────
-# 6. TEST GENERATION
+# 5. TEST GENERATION
 # ─────────────────────────────────────────────────────────────
  
 if page == "🧪 Tests":
@@ -1415,7 +1416,7 @@ if page == "🧪 Tests":
  
  
 # ─────────────────────────────────────────────────────────────
-# 7. REFACTOR
+# 6. REFACTOR
 # ─────────────────────────────────────────────────────────────
  
 if page == "🔧 Refactor":
@@ -1439,7 +1440,7 @@ if page == "🔧 Refactor":
  
  
 # ─────────────────────────────────────────────────────────────
-# 8. DOCUMENTATION
+# 7. DOCUMENTATION
 # ─────────────────────────────────────────────────────────────
  
 if page == "📚 Docs":
@@ -1457,7 +1458,7 @@ if page == "📚 Docs":
  
  
 # ─────────────────────────────────────────────────────────────
-# 9. DEPENDENCY GRAPH
+# 8. DEPENDENCY GRAPH
 # ─────────────────────────────────────────────────────────────
  
 if page == "🔗 Dependency Graph":
@@ -1483,7 +1484,7 @@ if page == "🔗 Dependency Graph":
  
  
 # ─────────────────────────────────────────────────────────────
-# 10. AI CODE EXPLANATION
+# 9. AI CODE EXPLANATION
 # ─────────────────────────────────────────────────────────────
  
 if page == "💡 Explain Code":
@@ -1497,7 +1498,7 @@ if page == "💡 Explain Code":
  
  
 # ─────────────────────────────────────────────────────────────
-# 11. MULTI-FILE ANALYSIS
+# 10. MULTI-FILE ANALYSIS
 # ─────────────────────────────────────────────────────────────
  
 if page == "🌐 Multi-file Analysis":
@@ -1535,7 +1536,7 @@ if page == "🌐 Multi-file Analysis":
  
  
 # ─────────────────────────────────────────────────────────────
-# 12. AI CODE REVIEW BOT
+# 11. AI CODE REVIEW BOT
 # ─────────────────────────────────────────────────────────────
  
 if page == "👨‍💻 Code Review Bot":
@@ -1559,7 +1560,7 @@ if page == "👨‍💻 Code Review Bot":
  
  
 # ─────────────────────────────────────────────────────────────
-# 13. TECHNICAL DEBT
+# 12. TECHNICAL DEBT
 # ─────────────────────────────────────────────────────────────
  
 if page == "💰 Technical Debt":
@@ -1658,7 +1659,7 @@ if page == "🐙 Git Analysis":
  
  
 # ─────────────────────────────────────────────────────────────
-# 15. LOGICAL COUPLING (git history mining)
+# 14. LOGICAL COUPLING (git history mining)
 # ─────────────────────────────────────────────────────────────
  
 if page == "🔀 Logical Coupling":
@@ -1716,7 +1717,80 @@ if page == "🔀 Logical Coupling":
  
  
 # ─────────────────────────────────────────────────────────────
-# 16. CLONE DETECTION (semantic, embedding-based)
+# 15. CLONE DETECTION (semantic, embedding-based)
+# ─────────────────────────────────────────────────────────────
+
+with t15:
+    st.markdown("## 🧬 Code Clone Detection")
+    st.caption(
+        "Finds duplicate code two different ways: **Semantic** mode catches code "
+        "that MEANS the same thing but is written differently (using embeddings). "
+        "**Structural** mode catches code that's an exact or near-exact copy with "
+        "renamed variables (using AST fingerprinting) — a case embeddings can miss."
+    )
+
+    detection_mode = st.radio(
+        "Detection mode",
+        ["Semantic (meaning-based)", "Structural (exact/renamed copies)"],
+        horizontal=True
+    )
+
+    if detection_mode == "Semantic (meaning-based)":
+        threshold = st.slider("Similarity threshold", 0.70, 0.99, 0.85, 0.01)
+
+        if st.button("Detect Semantic Clones"):
+            with st.spinner("Comparing every function pair across all files..."):
+                summary = summarize_clones(parsed_files, threshold=threshold)
+
+            c1, c2 = st.columns(2)
+            c1.metric("Functions/Classes Scanned", summary["total_functions_classes"])
+            c2.metric("Duplication %", f"{summary['duplication_percentage']}%")
+
+            st.divider()
+            st.write("### Clone Pairs")
+
+            if not summary["clone_pairs"]:
+                st.success("No near-duplicate functions found above this threshold.")
+
+            for p in summary["clone_pairs"]:
+                st.warning(
+                    f"**{p['a_name']}** ({p['a_file']}:{p['a_line']}) ↔ "
+                    f"**{p['b_name']}** ({p['b_file']}:{p['b_line']}) — "
+                    f"similarity {p['similarity']}"
+                )
+
+            if summary["clone_families"].get("clusters"):
+                st.write("### Clone Families (3+ similar functions)")
+                for i, family in enumerate(summary["clone_families"]["clusters"], 1):
+                    names = ", ".join(f"{m['name']} ({m['file']})" for m in family)
+                    st.info(f"Family {i}: {names}")
+
+    else:
+        st.caption(
+            "Finds functions that are structurally identical — same logic, "
+            "different names — using normalized AST fingerprinting."
+        )
+
+        if st.button("Detect Structural Clones"):
+            with st.spinner("Fingerprinting every function's AST structure..."):
+                source_lookup = {
+                    parsed.get("file", ""): source
+                    for parsed, source in zip(parsed_files, all_sources)
+                }
+                result = find_structural_clones(parsed_files, source_lookup)
+
+            st.metric("Structural Clone Groups Found", result["total_clone_groups"])
+
+            if result["total_clone_groups"] == 0:
+                st.success("No exact structural duplicates found.")
+
+            for i, group in enumerate(result["clone_groups"], 1):
+                names = ", ".join(f"{m['name']} ({m['file']}:{m['line']})" for m in group)
+                st.warning(f"Clone group {i}: {names}")
+
+
+# ─────────────────────────────────────────────────────────────
+# 16. MODULE BOUNDARY DETECTION (Louvain community detection)
 # ─────────────────────────────────────────────────────────────
  
 if page == "🧬 Clone Detection":
@@ -1799,7 +1873,7 @@ if page == "🧩 Module Boundaries":
  
  
 # ─────────────────────────────────────────────────────────────
-# 18. RISK HOTSPOT PREDICTION
+# 17. RISK HOTSPOT PREDICTION
 # ─────────────────────────────────────────────────────────────
  
 if page == "🔥 Risk Hotspots":
@@ -1840,7 +1914,7 @@ if page == "🔥 Risk Hotspots":
  
  
 # ─────────────────────────────────────────────────────────────
-# 19. EXECUTION PATH REPLAY (static, safe — no code is run)
+# 18. EXECUTION PATH REPLAY (static, safe — no code is run)
 # ─────────────────────────────────────────────────────────────
  
 if page == "▶️ Execution Replay":
@@ -1886,7 +1960,7 @@ if page == "▶️ Execution Replay":
  
  
 # ─────────────────────────────────────────────────────────────
-# 20. NATURAL LANGUAGE CODE SEARCH
+# 19. NATURAL LANGUAGE CODE SEARCH
 # ─────────────────────────────────────────────────────────────
  
 if page == "🔎 NL Code Search":
@@ -1967,7 +2041,7 @@ if page == "🔎 NL Code Search":
  
  
 # ─────────────────────────────────────────────────────────────
-# 21. CHANGE IMPACT / RIPPLE EFFECT PREDICTOR
+# 20. CHANGE IMPACT / RIPPLE EFFECT PREDICTOR
 # ─────────────────────────────────────────────────────────────
  
 if page == "⚡ Change Impact":
