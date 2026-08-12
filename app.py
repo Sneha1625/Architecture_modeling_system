@@ -13,11 +13,6 @@ with Commit History
 # ─────────────────────────────────────────────────────────────
 from features.coupling_miner import mine_logical_coupling
 import streamlit as st
-with open("style.css") as f:
-    st.markdown(
-        f"<style>{f.read()}</style>",
-        unsafe_allow_html=True
-    )
 import sys
 import os
 import tempfile
@@ -31,6 +26,7 @@ from features.risk_predictor import compute_risk_scores
 from features.execution_tracer import trace_static_execution_path, draw_execution_step
 from features.NIcodesearch import CodeSearchEngine
 from features.impact_predictor import predict_change_impact
+from features.ast_structural_clones import find_structural_clones
 from dotenv import load_dotenv
 from features.github_analyzer import (
     clone_github_repository,
@@ -468,7 +464,6 @@ st.divider()
 
 tabs = st.tabs([
     "💻 Code",
-    "🌳 AST",
     "🤖 AI Analysis",
     "🏗️ Architecture",
     "🔢 Embeddings",
@@ -492,7 +487,7 @@ tabs = st.tabs([
 
 (
     t1, t2, t3, t4, t5, t6, t7, t8, t9, t10,
-    t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21
+    t11, t12, t13, t14, t15, t16, t17, t18, t19, t20
 ) = tabs
 
 
@@ -509,19 +504,10 @@ with t1:
 
 
 # ─────────────────────────────────────────────────────────────
-# 2. AST
+# 2. AI ANALYSIS
 # ─────────────────────────────────────────────────────────────
 
 with t2:
-    st.header("🌳 Abstract Syntax Tree")
-    st.json(parsed_files)
-
-
-# ─────────────────────────────────────────────────────────────
-# 3. AI ANALYSIS
-# ─────────────────────────────────────────────────────────────
-
-with t3:
     st.header("🤖 AI Code Analysis")
 
     if st.button("Run AI Analysis", key="ai_analysis"):
@@ -530,10 +516,10 @@ with t3:
 
 
 # ─────────────────────────────────────────────────────────────
-# 4. INTERACTIVE ARCHITECTURE
+# 3. INTERACTIVE ARCHITECTURE
 # ─────────────────────────────────────────────────────────────
 
-with t4:
+with t3:
     st.header("🏗️ Interactive Software Architecture")
     st.write("Generate an interactive architecture map of your codebase.")
 
@@ -543,10 +529,10 @@ with t4:
 
 
 # ─────────────────────────────────────────────────────────────
-# 5. EMBEDDINGS
+# 4. EMBEDDINGS
 # ─────────────────────────────────────────────────────────────
 
-with t5:
+with t4:
     st.header("🔢 Semantic Embeddings")
 
     if st.button("Generate Embeddings", key="embeddings"):
@@ -555,10 +541,10 @@ with t5:
 
 
 # ─────────────────────────────────────────────────────────────
-# 6. TEST GENERATION
+# 5. TEST GENERATION
 # ─────────────────────────────────────────────────────────────
 
-with t6:
+with t5:
     st.header("🧪 Test Generator")
 
     if st.button("Generate Tests", key="tests"):
@@ -567,10 +553,10 @@ with t6:
 
 
 # ─────────────────────────────────────────────────────────────
-# 7. REFACTOR
+# 6. REFACTOR
 # ─────────────────────────────────────────────────────────────
 
-with t7:
+with t6:
     st.header("🔧 Refactoring Suggestions")
 
     if st.button("Refactor Code", key="refactor"):
@@ -589,10 +575,10 @@ with t7:
 
 
 # ─────────────────────────────────────────────────────────────
-# 8. DOCUMENTATION
+# 7. DOCUMENTATION
 # ─────────────────────────────────────────────────────────────
 
-with t8:
+with t7:
     st.header("📚 Documentation Generator")
 
     if st.button("Generate Documentation", key="documentation"):
@@ -605,10 +591,10 @@ with t8:
 
 
 # ─────────────────────────────────────────────────────────────
-# 9. DEPENDENCY GRAPH
+# 8. DEPENDENCY GRAPH
 # ─────────────────────────────────────────────────────────────
 
-with t9:
+with t8:
     st.header("🔗 Dependency Graph")
 
     if st.button("Generate Dependency Graph", key="dependency"):
@@ -629,10 +615,10 @@ with t9:
 
 
 # ─────────────────────────────────────────────────────────────
-# 10. AI CODE EXPLANATION
+# 9. AI CODE EXPLANATION
 # ─────────────────────────────────────────────────────────────
 
-with t10:
+with t9:
     st.header("💡 AI Code Explanation")
 
     if st.button("Explain Code", key="explain"):
@@ -641,10 +627,10 @@ with t10:
 
 
 # ─────────────────────────────────────────────────────────────
-# 11. MULTI-FILE ANALYSIS
+# 10. MULTI-FILE ANALYSIS
 # ─────────────────────────────────────────────────────────────
 
-with t11:
+with t10:
     st.header("🌐 Multi-file Cross Module Analysis")
 
     if st.button("🚀 Run Full Project Analysis", key="multifile"):
@@ -677,10 +663,10 @@ with t11:
 
 
 # ─────────────────────────────────────────────────────────────
-# 12. AI CODE REVIEW BOT
+# 11. AI CODE REVIEW BOT
 # ─────────────────────────────────────────────────────────────
 
-with t12:
+with t11:
     st.header("👨‍💻 AI Code Review Bot")
 
     option = st.selectbox("Choose code to review", ["Full Code", "Paste Custom Code"])
@@ -699,10 +685,10 @@ with t12:
 
 
 # ─────────────────────────────────────────────────────────────
-# 13. TECHNICAL DEBT
+# 12. TECHNICAL DEBT
 # ─────────────────────────────────────────────────────────────
 
-with t13:
+with t12:
     st.header("💰 Technical Debt Calculator")
     st.write("Estimate technical debt based on code structure and complexity.")
 
@@ -723,10 +709,10 @@ with t13:
 
 
 # ─────────────────────────────────────────────────────────────
-# 14. GITHUB REPOSITORY ANALYZER
+# 13. GITHUB REPOSITORY ANALYZER
 # ─────────────────────────────────────────────────────────────
 
-with t14:
+with t13:
     st.markdown("## 🐙 GitHub Repository Analyzer")
 
     st.write(
@@ -819,10 +805,10 @@ with t14:
 
 
 # ─────────────────────────────────────────────────────────────
-# 15. LOGICAL COUPLING (git history mining)
+# 14. LOGICAL COUPLING (git history mining)
 # ─────────────────────────────────────────────────────────────
 
-with t15:
+with t14:
     st.markdown("## 🔀 Git History — Logical Coupling")
 
     st.write(
@@ -877,51 +863,83 @@ with t15:
 
 
 # ─────────────────────────────────────────────────────────────
-# 16. CLONE DETECTION (semantic, embedding-based)
+# 15. CLONE DETECTION (semantic, embedding-based)
+# ─────────────────────────────────────────────────────────────
+
+with t15:
+    st.markdown("## 🧬 Code Clone Detection")
+    st.caption(
+        "Finds duplicate code two different ways: **Semantic** mode catches code "
+        "that MEANS the same thing but is written differently (using embeddings). "
+        "**Structural** mode catches code that's an exact or near-exact copy with "
+        "renamed variables (using AST fingerprinting) — a case embeddings can miss."
+    )
+
+    detection_mode = st.radio(
+        "Detection mode",
+        ["Semantic (meaning-based)", "Structural (exact/renamed copies)"],
+        horizontal=True
+    )
+
+    if detection_mode == "Semantic (meaning-based)":
+        threshold = st.slider("Similarity threshold", 0.70, 0.99, 0.85, 0.01)
+
+        if st.button("Detect Semantic Clones"):
+            with st.spinner("Comparing every function pair across all files..."):
+                summary = summarize_clones(parsed_files, threshold=threshold)
+
+            c1, c2 = st.columns(2)
+            c1.metric("Functions/Classes Scanned", summary["total_functions_classes"])
+            c2.metric("Duplication %", f"{summary['duplication_percentage']}%")
+
+            st.divider()
+            st.write("### Clone Pairs")
+
+            if not summary["clone_pairs"]:
+                st.success("No near-duplicate functions found above this threshold.")
+
+            for p in summary["clone_pairs"]:
+                st.warning(
+                    f"**{p['a_name']}** ({p['a_file']}:{p['a_line']}) ↔ "
+                    f"**{p['b_name']}** ({p['b_file']}:{p['b_line']}) — "
+                    f"similarity {p['similarity']}"
+                )
+
+            if summary["clone_families"].get("clusters"):
+                st.write("### Clone Families (3+ similar functions)")
+                for i, family in enumerate(summary["clone_families"]["clusters"], 1):
+                    names = ", ".join(f"{m['name']} ({m['file']})" for m in family)
+                    st.info(f"Family {i}: {names}")
+
+    else:
+        st.caption(
+            "Finds functions that are structurally identical — same logic, "
+            "different names — using normalized AST fingerprinting."
+        )
+
+        if st.button("Detect Structural Clones"):
+            with st.spinner("Fingerprinting every function's AST structure..."):
+                source_lookup = {
+                    parsed.get("file", ""): source
+                    for parsed, source in zip(parsed_files, all_sources)
+                }
+                result = find_structural_clones(parsed_files, source_lookup)
+
+            st.metric("Structural Clone Groups Found", result["total_clone_groups"])
+
+            if result["total_clone_groups"] == 0:
+                st.success("No exact structural duplicates found.")
+
+            for i, group in enumerate(result["clone_groups"], 1):
+                names = ", ".join(f"{m['name']} ({m['file']}:{m['line']})" for m in group)
+                st.warning(f"Clone group {i}: {names}")
+
+
+# ─────────────────────────────────────────────────────────────
+# 16. MODULE BOUNDARY DETECTION (Louvain community detection)
 # ─────────────────────────────────────────────────────────────
 
 with t16:
-    st.markdown("## 🧬 Semantic Code Clone Detection")
-    st.caption(
-        "Finds functions that MEAN the same thing even if worded "
-        "differently — powered by embeddings, not text-matching."
-    )
-
-    threshold = st.slider("Similarity threshold", 0.70, 0.99, 0.85, 0.01)
-
-    if st.button("Detect Clones"):
-        with st.spinner("Comparing every function pair across all files..."):
-            summary = summarize_clones(parsed_files, threshold=threshold)
-
-        c1, c2 = st.columns(2)
-        c1.metric("Functions/Classes Scanned", summary["total_functions_classes"])
-        c2.metric("Duplication %", f"{summary['duplication_percentage']}%")
-
-        st.divider()
-        st.write("### Clone Pairs")
-
-        if not summary["clone_pairs"]:
-            st.success("No near-duplicate functions found above this threshold.")
-
-        for p in summary["clone_pairs"]:
-            st.warning(
-                f"**{p['a_name']}** ({p['a_file']}:{p['a_line']}) ↔ "
-                f"**{p['b_name']}** ({p['b_file']}:{p['b_line']}) — "
-                f"similarity {p['similarity']}"
-            )
-
-        if summary["clone_families"].get("clusters"):
-            st.write("### Clone Families (3+ similar functions)")
-            for i, family in enumerate(summary["clone_families"]["clusters"], 1):
-                names = ", ".join(f"{m['name']} ({m['file']})" for m in family)
-                st.info(f"Family {i}: {names}")
-
-
-# ─────────────────────────────────────────────────────────────
-# 17. MODULE BOUNDARY DETECTION (Louvain community detection)
-# ─────────────────────────────────────────────────────────────
-
-with t17:
     st.markdown("## 🧩 Automatic Module Boundary Detection")
     st.caption(
         "Uses Louvain community detection on the dependency graph to "
@@ -956,10 +974,10 @@ with t17:
 
 
 # ─────────────────────────────────────────────────────────────
-# 18. RISK HOTSPOT PREDICTION
+# 17. RISK HOTSPOT PREDICTION
 # ─────────────────────────────────────────────────────────────
 
-with t18:
+with t17:
     st.markdown("## 🔥 Defect Risk Hotspot Prediction")
     st.caption(
         "Combines complexity + git churn + bugfix-commit history to "
@@ -996,10 +1014,10 @@ with t18:
 
 
 # ─────────────────────────────────────────────────────────────
-# 19. EXECUTION PATH REPLAY (static, safe — no code is run)
+# 18. EXECUTION PATH REPLAY (static, safe — no code is run)
 # ─────────────────────────────────────────────────────────────
 
-with t19:
+with t18:
     st.markdown("## ▶️ Execution Path Replay (Static)")
     st.caption(
         "Walks the call graph from a chosen entry point and lets you step "
@@ -1040,10 +1058,10 @@ with t19:
 
 
 # ─────────────────────────────────────────────────────────────
-# 20. NATURAL LANGUAGE CODE SEARCH
+# 19. NATURAL LANGUAGE CODE SEARCH
 # ─────────────────────────────────────────────────────────────
 
-with t20:
+with t19:
     st.markdown("## 🔎 Natural Language Code Search")
     st.caption(
         "Search your codebase in plain English — e.g. 'function that validates "
@@ -1119,10 +1137,10 @@ with t20:
 
 
 # ─────────────────────────────────────────────────────────────
-# 21. CHANGE IMPACT / RIPPLE EFFECT PREDICTOR
+# 20. CHANGE IMPACT / RIPPLE EFFECT PREDICTOR
 # ─────────────────────────────────────────────────────────────
 
-with t21:
+with t20:
     st.markdown("## ⚡ Change Impact / Ripple Predictor")
     st.caption(
         "Pick a file you're about to change — see everything likely to be "
