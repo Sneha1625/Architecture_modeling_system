@@ -8,65 +8,172 @@ import json
 from groq import Groq
 from dotenv import load_dotenv
 
+
+# ============================================================
+# ENVIRONMENT / GROQ API CONFIGURATION
+# ============================================================
+
+# Get the directory where this analyzer.py file is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
 
+# Since analyzer.py is inside src/,
+# this points to: Architecture_modeling_system/src/.env
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+
+# Load environment variables from src/.env
+load_dotenv(ENV_PATH, override=True)
+
+# Read the API key
 api_key = os.getenv("GROQ_API_KEY")
+
+# Check whether the API key exists
 if not api_key:
-    raise ValueError("GROQ_API_KEY not found! Check src/.env file.")
+    raise ValueError(
+        f"GROQ_API_KEY not found!\n"
+        f"Expected .env file at:\n{ENV_PATH}\n\n"
+        f"Make sure your src/.env contains:\n"
+        f"GROQ_API_KEY=your_actual_groq_api_key"
+    )
 
+# Create Groq client
 client = Groq(api_key=api_key)
-MODEL  = "llama-3.3-70b-versatile"
 
+# Groq model
+MODEL = "llama-3.3-70b-versatile"
+
+
+# ============================================================
+# GROQ API HELPER
+# ============================================================
 
 def _call(prompt: str, max_tokens: int = 600) -> str:
-    """Helper to call Groq API and return text."""
-    response = client.chat.completions.create(
-        model=MODEL,
-        max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content.strip()
+    """
+    Helper function to call the Groq API and return text.
+    """
 
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            max_tokens=max_tokens,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        return f"Groq API Error: {str(e)}"
+
+
+# ============================================================
+# JSON PARSER
+# ============================================================
 
 def _parse_json(raw: str, fallback: dict) -> dict:
-    """Clean and parse JSON from LLM response."""
-    cleaned = raw.replace("```json", "").replace("```", "").strip()
+    """
+    Clean and parse JSON from LLM response.
+    """
+
+    if not raw:
+        return fallback
+
+    cleaned = raw.strip()
+
+    # Remove markdown JSON fences
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+
+    cleaned = cleaned.strip()
+
     try:
         return json.loads(cleaned)
+
     except json.JSONDecodeError:
-        fallback["responsibility"] = raw[:200]
+        fallback["responsibility"] = cleaned[:200]
         return fallback
 
 
-def analyze_function(func: dict, source_code: str, file_path: str) -> dict:
-    """Analyze a single function using Groq AI."""
+# ============================================================
+# FUNCTION ANALYSIS
+# ============================================================
+
+def analyze_function(
+    func: dict,
+    source_code: str,
+    file_path: str
+) -> dict:
+    """
+    Analyze a single function using Groq AI.
+    """
+
     args_str = ", ".join(
-        f"{a['name']}: {a['type']}" if a.get("type") else a["name"]
+        f"{a['name']}: {a['type']}"
+        if a.get("type")
+        else a["name"]
         for a in func.get("args", [])
     )
-    return_type      = func.get("return_type", "")
-    docstring        = func.get("docstring", "No docstring provided")
-    complexity       = func.get("complexity", 1)
-    complexity_label = func.get("complexity_label", "low")
-    calls            = func.get("calls", [])
-    is_async         = func.get("is_async", False)
-    decorators       = func.get("decorators", [])
 
-    prompt = f"""You are an expert Python code reviewer for a VTU major project on AI-driven code analysis.
+    return_type = func.get("return_type", "")
+    docstring = func.get(
+        "docstring",
+        "No docstring provided"
+    )
+
+    complexity = func.get("complexity", 1)
+
+    complexity_label = func.get(
+        "complexity_label",
+        "low"
+    )
+
+    calls = func.get("calls", [])
+
+    is_async = func.get(
+        "is_async",
+        False
+    )
+
+    decorators = func.get(
+        "decorators",
+        []
+    )
+
+    prompt = f"""
+You are an expert Python code reviewer for a VTU major project on AI-driven code analysis.
 
 File: {file_path}
-Function: {'async ' if is_async else ''}def {func['name']}({args_str}){' -> ' + return_type if return_type else ''}
+
+Function:
+{'async ' if is_async else ''}def {func['name']}({args_str})
+{' -> ' + return_type if return_type else ''}
+
 Line: {func['line']}
-Cyclomatic Complexity: {complexity} ({complexity_label})
-Calls: {', '.join(calls) if calls else 'none'}
-Decorators: {', '.join(decorators) if decorators else 'none'}
-Docstring: {docstring}
+
+Cyclomatic Complexity:
+{complexity} ({complexity_label})
+
+Calls:
+{', '.join(calls) if calls else 'none'}
+
+Decorators:
+{', '.join(decorators) if decorators else 'none'}
+
+Docstring:
+{docstring}
 
 Source code:
 ```python
 {source_code[:3000]}
-```
 
 Analyze ONLY the function '{func['name']}' and return a JSON object with this exact structure:
 {{

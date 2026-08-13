@@ -1720,73 +1720,315 @@ if page == "🔀 Logical Coupling":
 # 15. CLONE DETECTION (semantic, embedding-based)
 # ─────────────────────────────────────────────────────────────
 
-with t15:
+# ============================================================
+# 🧬 CODE CLONE DETECTION
+# ============================================================
+
+elif page == "🧬 Clone Detection":
+
     st.markdown("## 🧬 Code Clone Detection")
+
     st.caption(
-        "Finds duplicate code two different ways: **Semantic** mode catches code "
-        "that MEANS the same thing but is written differently (using embeddings). "
-        "**Structural** mode catches code that's an exact or near-exact copy with "
-        "renamed variables (using AST fingerprinting) — a case embeddings can miss."
+        "Finds duplicate code two different ways: "
+        "**Semantic** mode catches code that MEANS the same thing "
+        "but is written differently using embeddings. "
+        "**Structural** mode catches code that's an exact or "
+        "near-exact copy with renamed variables using AST "
+        "fingerprinting — a case embeddings can miss."
     )
+
+    # --------------------------------------------------------
+    # CHECK FILES
+    # --------------------------------------------------------
+
+    require_uploaded_files()
+
+    # --------------------------------------------------------
+    # DETECTION MODE
+    # --------------------------------------------------------
 
     detection_mode = st.radio(
         "Detection mode",
-        ["Semantic (meaning-based)", "Structural (exact/renamed copies)"],
-        horizontal=True
+        [
+            "Semantic (meaning-based)",
+            "Structural (exact/renamed copies)"
+        ],
+        horizontal=True,
+        key="clone_detection_mode"
     )
 
+    # ========================================================
+    # SEMANTIC CLONE DETECTION
+    # ========================================================
+
     if detection_mode == "Semantic (meaning-based)":
-        threshold = st.slider("Similarity threshold", 0.70, 0.99, 0.85, 0.01)
 
-        if st.button("Detect Semantic Clones"):
-            with st.spinner("Comparing every function pair across all files..."):
-                summary = summarize_clones(parsed_files, threshold=threshold)
-
-            c1, c2 = st.columns(2)
-            c1.metric("Functions/Classes Scanned", summary["total_functions_classes"])
-            c2.metric("Duplication %", f"{summary['duplication_percentage']}%")
-
-            st.divider()
-            st.write("### Clone Pairs")
-
-            if not summary["clone_pairs"]:
-                st.success("No near-duplicate functions found above this threshold.")
-
-            for p in summary["clone_pairs"]:
-                st.warning(
-                    f"**{p['a_name']}** ({p['a_file']}:{p['a_line']}) ↔ "
-                    f"**{p['b_name']}** ({p['b_file']}:{p['b_line']}) — "
-                    f"similarity {p['similarity']}"
-                )
-
-            if summary["clone_families"].get("clusters"):
-                st.write("### Clone Families (3+ similar functions)")
-                for i, family in enumerate(summary["clone_families"]["clusters"], 1):
-                    names = ", ".join(f"{m['name']} ({m['file']})" for m in family)
-                    st.info(f"Family {i}: {names}")
-
-    else:
         st.caption(
-            "Finds functions that are structurally identical — same logic, "
-            "different names — using normalized AST fingerprinting."
+            "Finds functions that have similar meaning even when "
+            "their implementation is written differently."
         )
 
-        if st.button("Detect Structural Clones"):
-            with st.spinner("Fingerprinting every function's AST structure..."):
-                source_lookup = {
-                    parsed.get("file", ""): source
-                    for parsed, source in zip(parsed_files, all_sources)
-                }
-                result = find_structural_clones(parsed_files, source_lookup)
+        threshold = st.slider(
+            "Similarity threshold",
+            0.70,
+            0.99,
+            0.85,
+            0.01,
+            key="semantic_clone_threshold"
+        )
 
-            st.metric("Structural Clone Groups Found", result["total_clone_groups"])
+        if st.button(
+            "🔍 Detect Semantic Clones",
+            use_container_width=True,
+            type="primary",
+            key="detect_semantic_clones"
+        ):
 
-            if result["total_clone_groups"] == 0:
-                st.success("No exact structural duplicates found.")
+            with st.spinner(
+                "🧠 Comparing every function pair across all files..."
+            ):
 
-            for i, group in enumerate(result["clone_groups"], 1):
-                names = ", ".join(f"{m['name']} ({m['file']}:{m['line']})" for m in group)
-                st.warning(f"Clone group {i}: {names}")
+                try:
+
+                    summary = summarize_clones(
+                        parsed_files,
+                        threshold=threshold
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"❌ Semantic clone detection failed: {e}"
+                    )
+
+                    st.exception(e)
+                    st.stop()
+
+            # ------------------------------------------------
+            # SUMMARY
+            # ------------------------------------------------
+
+            st.markdown("### 📊 Detection Summary")
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+
+                st.metric(
+                    "Functions / Classes Scanned",
+                    summary.get(
+                        "total_functions_classes",
+                        0
+                    )
+                )
+
+            with c2:
+
+                st.metric(
+                    "Duplication %",
+                    f"{summary.get('duplication_percentage', 0)}%"
+                )
+
+            st.divider()
+
+            # ------------------------------------------------
+            # CLONE PAIRS
+            # ------------------------------------------------
+
+            st.markdown("### 🔗 Clone Pairs")
+
+            clone_pairs = summary.get(
+                "clone_pairs",
+                []
+            )
+
+            if not clone_pairs:
+
+                st.success(
+                    "✅ No near-duplicate functions found "
+                    "above this threshold."
+                )
+
+            else:
+
+                for i, p in enumerate(
+                    clone_pairs,
+                    1
+                ):
+
+                    a_name = p.get(
+                        "a_name",
+                        "Unknown"
+                    )
+
+                    a_file = p.get(
+                        "a_file",
+                        "Unknown"
+                    )
+
+                    a_line = p.get(
+                        "a_line",
+                        "?"
+                    )
+
+                    b_name = p.get(
+                        "b_name",
+                        "Unknown"
+                    )
+
+                    b_file = p.get(
+                        "b_file",
+                        "Unknown"
+                    )
+
+                    b_line = p.get(
+                        "b_line",
+                        "?"
+                    )
+
+                    similarity = p.get(
+                        "similarity",
+                        0
+                    )
+
+                    st.warning(
+                        f"**{a_name}** "
+                        f"({a_file}:{a_line}) ↔ "
+                        f"**{b_name}** "
+                        f"({b_file}:{b_line}) — "
+                        f"similarity **{similarity}**"
+                    )
+
+            # ------------------------------------------------
+            # CLONE FAMILIES
+            # ------------------------------------------------
+
+            clone_families = summary.get(
+                "clone_families",
+                {}
+            )
+
+            clusters = clone_families.get(
+                "clusters",
+                []
+            ) if isinstance(
+                clone_families,
+                dict
+            ) else []
+
+            if clusters:
+
+                st.markdown(
+                    "### 👨‍👩‍👧 Clone Families "
+                    "(3+ similar functions)"
+                )
+
+                for i, family in enumerate(
+                    clusters,
+                    1
+                ):
+
+                    names = ", ".join(
+                        f"{m.get('name', 'Unknown')} "
+                        f"({m.get('file', 'Unknown')})"
+                        for m in family
+                    )
+
+                    st.info(
+                        f"**Family {i}:** {names}"
+                    )
+
+    # ========================================================
+    # STRUCTURAL CLONE DETECTION
+    # ========================================================
+
+    else:
+
+        st.caption(
+            "Finds functions that are structurally identical — "
+            "same logic with different names — using normalized "
+            "AST fingerprinting."
+        )
+
+        if st.button(
+            "🔍 Detect Structural Clones",
+            use_container_width=True,
+            type="primary",
+            key="detect_structural_clones"
+        ):
+
+            with st.spinner(
+                "🌳 Fingerprinting every function's AST structure..."
+            ):
+
+                try:
+
+                    source_lookup = {
+                        parsed.get("file", ""): source
+                        for parsed, source in zip(
+                            parsed_files,
+                            all_sources
+                        )
+                    }
+
+                    result = find_structural_clones(
+                        parsed_files,
+                        source_lookup
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"❌ Structural clone detection failed: {e}"
+                    )
+
+                    st.exception(e)
+                    st.stop()
+
+            # ------------------------------------------------
+            # RESULT
+            # ------------------------------------------------
+
+            total_groups = result.get(
+                "total_clone_groups",
+                0
+            )
+
+            st.metric(
+                "🧬 Structural Clone Groups Found",
+                total_groups
+            )
+
+            if total_groups == 0:
+
+                st.success(
+                    "✅ No exact structural duplicates found."
+                )
+
+            else:
+
+                st.markdown(
+                    "### 🔗 Structural Clone Groups"
+                )
+
+                for i, group in enumerate(
+                    result.get(
+                        "clone_groups",
+                        []
+                    ),
+                    1
+                ):
+
+                    names = ", ".join(
+                        f"{m.get('name', 'Unknown')} "
+                        f"({m.get('file', 'Unknown')}:"
+                        f"{m.get('line', '?')})"
+                        for m in group
+                    )
+
+                    st.warning(
+                        f"**Clone group {i}:** {names}"
+                    )
 
 
 # ─────────────────────────────────────────────────────────────
