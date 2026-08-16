@@ -1,0 +1,32 @@
+{
+    "version": "1.0",
+    "commit_hash": "test123",
+    "components": [
+        {
+            "id": "component_payment",
+            "name": "Payment",
+            "responsibility": "Payment processing",
+            "layer": "service",
+            "files": [
+                "payment/controller.py",
+                "payment/service.py",
+                "payment/repository.py"
+            ],
+            "dependencies": [
+                "component_database"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "source": "component_payment",
+            "target": "component_database",
+            "type": "depends_on"
+        }
+    ],
+    "metrics": {
+        "total_components": 1
+    },
+    "violations": [],
+    "timestamp": "2026-08-16T11:29:24.810617"
+}
