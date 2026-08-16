@@ -10,19 +10,8 @@ from pathlib import Path
 import subprocess
 import ast
 from architecture_model.recovery import recover_architecture
-from architecture_model.time_machine import compare_architectures
-from architecture_model.diff import compare_architectures as compare_architecture_diff
-from architecture_model.timeline import (
-    build_architecture_timeline,
-    analyze_architecture_evolution,
-    summarize_evolution
-)
-from architecture_model.graph_diff import build_architecture_graph
 from features.clone_detector import summarize_clones
 from features.community_detector import analyze_modularity
-from architecture_model.recovery import recover_architecture
-from architecture_model.time_machine import compare_architectures
-from architecture_model.time_machine import compare_architectures
 from features.risk_predictor import compute_risk_scores
 from features.execution_tracer import trace_static_execution_path, draw_execution_step
 from features.NIcodesearch import CodeSearchEngine
@@ -3456,6 +3445,398 @@ if page == "🔥 Risk Hotspots":
 # EXECUTION REPLAY
 # ─────────────────────────────────────────────────────────────
 
+if page == "▶️ Execution Replay":
+
+    require_uploaded_files()
+
+    st.markdown(
+        "## ▶️ Execution Path Replay (Static)"
+    )
+
+    st.caption(
+        "Walks the call graph from a chosen entry point. "
+        "No code is actually executed."
+    )
+
+    G = nx.DiGraph()
+
+    for path in file_paths:
+
+        sub = build_dependency_graph(
+            path
+        )
+
+        G = nx.compose(
+            G,
+            sub
+        )
+
+    if G.number_of_nodes() == 0:
+
+        st.info(
+            "No functions found to trace."
+        )
+
+    else:
+
+        entry_point = st.selectbox(
+            "Choose entry function",
+            sorted(G.nodes)
+        )
+
+        if entry_point:
+
+            result = trace_static_execution_path(
+                G,
+                entry_point
+            )
+
+            if "error" in result:
+
+                st.error(
+                    result["error"]
+                )
+
+            elif result["total_steps"] == 0:
+
+                st.info(
+                    f"'{entry_point}' doesn't call "
+                    "any other tracked functions."
+                )
+
+            else:
+
+                step = st.slider(
+                    "Step",
+                    0,
+                    result["total_steps"],
+                    0
+                )
+
+                os.makedirs(
+                    "outputs",
+                    exist_ok=True
+                )
+
+                output_path = os.path.join(
+                    "outputs",
+                    "exec_step.png"
+                )
+
+                draw_execution_step(
+                    G,
+                    result["steps"],
+                    step,
+                    output_path
+                )
+
+                st.image(
+                    output_path
+                )
+
+                if step > 0:
+
+                    s = result[
+                        "steps"
+                    ][step - 1]
+
+                    st.info(
+                        f"Step {step}: "
+                        f"**{s['from']}** calls "
+                        f"**{s['to']}**"
+                    )
+
+
+# ─────────────────────────────────────────────────────────────
+# NATURAL LANGUAGE CODE SEARCH
+# ─────────────────────────────────────────────────────────────
+
+if page == "🔎 NL Code Search":
+
+    require_uploaded_files()
+
+    st.markdown(
+        "## 🔎 Natural Language Code Search"
+    )
+
+    st.caption(
+        "Search your codebase in plain English using "
+        "local semantic embeddings."
+    )
+
+    if (
+        "search_engine" not in st.session_state
+        or st.session_state.get(
+            "search_files_count"
+        ) != len(parsed_files)
+    ):
+
+        with st.spinner(
+            "Building semantic search index..."
+        ):
+
+            engine = CodeSearchEngine()
+
+            count = engine.build_index(
+                parsed_files
+            )
+
+            st.session_state[
+                "search_engine"
+            ] = engine
+
+            st.session_state[
+                "search_files_count"
+            ] = len(parsed_files)
+
+        st.success(
+            f"Indexed {count} functions/classes."
+        )
+
+    engine = st.session_state[
+        "search_engine"
+    ]
+
+    query = st.text_input(
+        "Search query",
+        placeholder=(
+            "e.g. function that connects to database"
+        )
+    )
+
+    col1, col2 = st.columns(2)
+
+    filter_type = col1.selectbox(
+        "Filter by type",
+        [
+            None,
+            "function",
+            "class"
+        ],
+        format_func=lambda x: x or "Any"
+    )
+
+    filter_complexity = col2.selectbox(
+        "Filter by complexity",
+        [
+            None,
+            "low",
+            "medium",
+            "high"
+        ],
+        format_func=lambda x: x or "Any"
+    )
+
+    if query:
+
+        results = engine.search(
+            query,
+            top_k=10,
+            filter_type=filter_type,
+            filter_complexity=filter_complexity
+        )
+
+        if not results:
+
+            st.info(
+                "No matches found. "
+                "Try a different phrasing."
+            )
+
+        for r in results:
+
+            st.markdown(
+                f"**{r['name']}** "
+                f"({r['type']}) — "
+                f"`{r['file']}:{r['line']}` "
+                f"— similarity {r['similarity']}"
+            )
+
+            if r.get(
+                "docstring"
+            ):
+
+                st.caption(
+                    r["docstring"]
+                )
+
+            st.divider()
+
+    st.markdown(
+        "### 📊 Codebase Stats"
+    )
+
+    stats = engine.get_stats()
+
+    sc1, sc2, sc3, sc4 = st.columns(4)
+
+    sc1.metric(
+        "Indexed items",
+        stats["total_indexed"]
+    )
+
+    sc2.metric(
+        "Undocumented",
+        stats["undocumented"]
+    )
+
+    sc3.metric(
+        "High complexity",
+        stats["high_complexity"]
+    )
+
+    sc4.metric(
+        "Async functions",
+        stats["async_fns"]
+    )
+
+    if st.button(
+        "Show Complexity Hotspots"
+    ):
+
+        hotspots = engine.get_complexity_hotspots(
+            top_k=5
+        )
+
+        for h in hotspots:
+
+            st.warning(
+                f"**{h['name']}** "
+                f"({h['file']}:{h['line']}) — "
+                f"complexity {h['complexity']}"
+            )
+
+
+# ─────────────────────────────────────────────────────────────
+# CHANGE IMPACT
+# ─────────────────────────────────────────────────────────────
+
+if page == "⚡ Change Impact":
+
+    st.markdown(
+        "## ⚡ Change Impact / Ripple Predictor"
+    )
+
+    st.caption(
+        "Combines the dependency graph, logical coupling "
+        "history and risk scores."
+    )
+
+    impact_target = st.session_state.get(
+        "github_repo_path",
+        None
+    )
+
+    if not impact_target:
+
+        st.warning(
+            "This feature needs full git history. "
+            "Paste a GitHub link in the Analyzer page first."
+        )
+
+    else:
+
+        require_uploaded_files()
+
+        G = nx.DiGraph()
+
+        for path in file_paths:
+
+            sub = build_dependency_graph(
+                path
+            )
+
+            G = nx.compose(
+                G,
+                sub
+            )
+
+        if G.number_of_nodes() == 0:
+
+            st.info(
+                "No files to analyze."
+            )
+
+        else:
+
+            target_file = st.selectbox(
+                "File you're about to change",
+                sorted(G.nodes)
+            )
+
+            if st.button(
+                "Predict Impact"
+            ):
+
+                with st.spinner(
+                    "Combining structural graph, "
+                    "coupling history, and risk scores..."
+                ):
+
+                    result = predict_change_impact(
+                        target_file,
+                        G,
+                        impact_target,
+                        parsed_files
+                    )
+
+                st.metric(
+                    "Files Likely Affected",
+                    result[
+                        "total_impacted_files"
+                    ]
+                )
+
+                if (
+                    result[
+                        "total_impacted_files"
+                    ] == 0
+                ):
+
+                    st.success(
+                        "No related files detected — "
+                        "this file appears isolated."
+                    )
+
+                for item in result[
+                    "impacted_files"
+                ]:
+
+                    label = item[
+                        "risk_label"
+                    ]
+
+                    if label == "HIGH":
+
+                        color = "error"
+
+                    elif label == "MEDIUM":
+
+                        color = "warning"
+
+                    else:
+
+                        color = "success"
+
+                    reasons = "; ".join(
+                        item["reasons"]
+                    )
+
+                    score_text = (
+                        f"risk {item['risk_score']}/100"
+                        if item["risk_score"] is not None
+                        else "risk unknown"
+                    )
+
+                    getattr(
+                        st,
+                        color
+                    )(
+                        f"**{item['file']}** "
+                        f"({score_text}) — {reasons}"
+                    )
+
+
 # ─────────────────────────────────────────────────────────────
 # ARCHITECTURE TIME MACHINE
 # ─────────────────────────────────────────────────────────────
@@ -3761,9 +4142,9 @@ if page == "⏳ Architecture Time Machine":
                             expanded=False
                         )
 
-            # ====================================================
+            # ------------------------------------------------
             # COMPARE TWO ARCHITECTURE SNAPSHOTS
-            # ====================================================
+            # ------------------------------------------------
 
             if len(snapshots) >= 2:
 
@@ -3830,504 +4211,8 @@ if page == "⏳ Architecture Time Machine":
 
                 st.dataframe(
                     comparison_rows,
-                    use_container_width=True,
-                    hide_index=True
+                    use_container_width=True
                 )
-
-                # ====================================================
-                # ARCHITECTURE CHANGE ANALYSIS
-                # ====================================================
-
-                st.divider()
-
-                st.markdown(
-                    "### 📊 Architecture Change Analysis"
-                )
-
-                st.caption(
-                    "Detailed comparison between the previous "
-                    "and current architecture snapshots."
-                )
-
-                old_snapshot = snapshots[-2]
-                new_snapshot = snapshots[-1]
-
-                # ====================================================
-                # CHANGE SCORE
-                # ====================================================
-
-                try:
-
-                    diff_result = compare_architecture_diff(
-                        old_snapshot,
-                        new_snapshot
-                    )
-
-                    summary = diff_result.get(
-                        "summary",
-                        {}
-                    )
-
-                    components_added = summary.get(
-                        "components_added",
-                        0
-                    )
-
-                    components_removed = summary.get(
-                        "components_removed",
-                        0
-                    )
-
-                    relationships_added = summary.get(
-                        "relationships_added",
-                        0
-                    )
-
-                    relationships_removed = summary.get(
-                        "relationships_removed",
-                        0
-                    )
-
-                    layers_changed = summary.get(
-                        "layers_changed",
-                        0
-                    )
-
-                    metrics_changed = summary.get(
-                        "metrics_changed",
-                        0
-                    )
-
-                    total_changes = (
-                        components_added
-                        + components_removed
-                        + relationships_added
-                        + relationships_removed
-                        + layers_changed
-                        + metrics_changed
-                    )
-
-                    change_score = min(
-                        100,
-                        total_changes * 15
-                    )
-
-                    if change_score == 0:
-
-                        change_level = "No Change"
-
-                    elif change_score <= 30:
-
-                        change_level = "Low"
-
-                    elif change_score <= 60:
-
-                        change_level = "Moderate"
-
-                    else:
-
-                        change_level = "High"
-
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-
-                        st.metric(
-                            "Architecture Change Score",
-                            f"{change_score}/100"
-                        )
-
-                    with col2:
-
-                        st.metric(
-                            "Change Level",
-                            change_level
-                        )
-
-                    with col3:
-
-                        st.metric(
-                            "Total Changes",
-                            total_changes
-                        )
-
-                    # ====================================================
-                    # CHANGE DETAILS
-                    # ====================================================
-
-                    st.markdown(
-                        "#### Change Details"
-                    )
-
-                    change_rows = [
-
-                        {
-                            "Change Type":
-                                "Components Added",
-                            "Count":
-                                components_added
-                        },
-
-                        {
-                            "Change Type":
-                                "Components Removed",
-                            "Count":
-                                components_removed
-                        },
-
-                        {
-                            "Change Type":
-                                "Relationships Added",
-                            "Count":
-                                relationships_added
-                        },
-
-                        {
-                            "Change Type":
-                                "Relationships Removed",
-                            "Count":
-                                relationships_removed
-                        },
-
-                        {
-                            "Change Type":
-                                "Layers Changed",
-                            "Count":
-                                layers_changed
-                        },
-
-                        {
-                            "Change Type":
-                                "Metrics Changed",
-                            "Count":
-                                metrics_changed
-                        }
-                    ]
-
-                    st.dataframe(
-                        change_rows,
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-                    # ====================================================
-                    # DETAILS
-                    # ====================================================
-
-                    with st.expander(
-                        "🔍 View Architecture Differences"
-                    ):
-
-                        st.json(
-                            diff_result,
-                            expanded=False
-                        )
-
-                except Exception as e:
-
-                    st.warning(
-                        f"Could not calculate architecture change score: {e}"
-                    )
-
-                # ====================================================
-                # COMMIT TIMELINE
-                # ====================================================
-
-                st.divider()
-
-                st.markdown(
-                    "### 🕐 Architecture Commit Timeline"
-                )
-
-                st.caption(
-                    "How the architecture changed across "
-                    "the recovered commits."
-                )
-
-                try:
-
-                    timeline = build_architecture_timeline(
-                        snapshots
-                    )
-
-                    evolution = analyze_architecture_evolution(
-                        snapshots
-                    )
-
-                    timeline_rows = []
-
-                    for index, entry in enumerate(
-                        timeline
-                    ):
-
-                        timeline_rows.append({
-
-                            "Step":
-                                index + 1,
-
-                            "Commit":
-                                str(
-                                    entry.get(
-                                        "commit_hash",
-                                        "unknown"
-                                    )
-                                )[:7],
-
-                            "Components":
-                                entry.get(
-                                    "components",
-                                    0
-                                ),
-
-                            "Relationships":
-                                entry.get(
-                                    "relationships",
-                                    0
-                                ),
-
-                            "Files":
-                                entry.get(
-                                    "files",
-                                    0
-                                )
-                        })
-
-                    st.dataframe(
-                        timeline_rows,
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-                    if evolution:
-
-                        st.markdown(
-                            "#### Evolution Between Commits"
-                        )
-
-                        for index, item in enumerate(
-                            evolution
-                        ):
-
-                            from_commit = str(
-                                item.get(
-                                    "from_commit",
-                                    "unknown"
-                                )
-                            )[:7]
-
-                            to_commit = str(
-                                item.get(
-                                    "to_commit",
-                                    "unknown"
-                                )
-                            )[:7]
-
-                            diff = item.get(
-                                "diff",
-                                {}
-                            )
-
-                            diff_summary = diff.get(
-                                "summary",
-                                {}
-                            )
-
-                            st.write(
-                                f"**{from_commit} → {to_commit}**"
-                            )
-
-                            st.json(
-                                diff_summary,
-                                expanded=False
-                            )
-
-                except Exception as e:
-
-                    st.warning(
-                        f"Could not build architecture timeline: {e}"
-                    )
-
-                # ====================================================
-                # BEFORE / AFTER GRAPH
-                # ====================================================
-
-                st.divider()
-
-                st.markdown(
-                    "### 🔄 Before vs After Architecture"
-                )
-
-                st.caption(
-                    "Visual comparison of the architecture "
-                    "before and after the latest recovered commit."
-                )
-
-                try:
-
-                    old_graph = build_architecture_graph(
-                        old_snapshot
-                    )
-
-                    new_graph = build_architecture_graph(
-                        new_snapshot
-                    )
-
-                    graph_col1, graph_col2 = st.columns(2)
-
-                    with graph_col1:
-
-                        st.markdown(
-                            "#### Architecture Before"
-                        )
-
-                        st.write(
-                            f"Components: "
-                            f"{old_graph.number_of_nodes()}"
-                        )
-
-                        st.write(
-                            f"Relationships: "
-                            f"{old_graph.number_of_edges()}"
-                        )
-
-                        old_nodes = list(
-                            old_graph.nodes()
-                        )
-
-                        old_edges = list(
-                            old_graph.edges()
-                        )
-
-                        st.write(
-                            "Components:",
-                            old_nodes
-                        )
-
-                        st.write(
-                            "Relationships:",
-                            old_edges
-                        )
-
-                    with graph_col2:
-
-                        st.markdown(
-                            "#### Architecture After"
-                        )
-
-                        st.write(
-                            f"Components: "
-                            f"{new_graph.number_of_nodes()}"
-                        )
-
-                        st.write(
-                            f"Relationships: "
-                            f"{new_graph.number_of_edges()}"
-                        )
-
-                        new_nodes = list(
-                            new_graph.nodes()
-                        )
-
-                        new_edges = list(
-                            new_graph.edges()
-                        )
-
-                        st.write(
-                            "Components:",
-                            new_nodes
-                        )
-
-                        st.write(
-                            "Relationships:",
-                            new_edges
-                        )
-
-                    # ====================================================
-                    # GRAPH CHANGES
-                    # ====================================================
-
-                    old_nodes_set = set(
-                        old_graph.nodes()
-                    )
-
-                    new_nodes_set = set(
-                        new_graph.nodes()
-                    )
-
-                    old_edges_set = set(
-                        old_graph.edges()
-                    )
-
-                    new_edges_set = set(
-                        new_graph.edges()
-                    )
-
-                    added_nodes = sorted(
-                        new_nodes_set
-                        - old_nodes_set
-                    )
-
-                    removed_nodes = sorted(
-                        old_nodes_set
-                        - new_nodes_set
-                    )
-
-                    added_edges = sorted(
-                        new_edges_set
-                        - old_edges_set
-                    )
-
-                    removed_edges = sorted(
-                        old_edges_set
-                        - new_edges_set
-                    )
-
-                    st.markdown(
-                        "#### Graph Changes"
-                    )
-
-                    graph_changes = [
-
-                        {
-                            "Change":
-                                "Added Components",
-                            "Details":
-                                added_nodes
-                        },
-
-                        {
-                            "Change":
-                                "Removed Components",
-                            "Details":
-                                removed_nodes
-                        },
-
-                        {
-                            "Change":
-                                "Added Relationships",
-                            "Details":
-                                added_edges
-                        },
-
-                        {
-                            "Change":
-                                "Removed Relationships",
-                            "Details":
-                                removed_edges
-                        }
-                    ]
-
-                    st.dataframe(
-                        graph_changes,
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-                except Exception as e:
-
-                    st.warning(
-                        f"Could not generate before/after graph comparison: {e}"
-                    )
 
 
 # ─────────────────────────────────────────────────────────────
